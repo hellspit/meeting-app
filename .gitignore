@@ -1,0 +1,30 @@
+# Secrets & private content
+.env
+logs/
+
+# Your personal meeting context stays local (keep the folder, ignore contents)
+context/*
+!context/README.md
+!context/.gitkeep
+
+# Python
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+
+# STT fixture audio is generated locally; keep the folder scaffolding
+scripts/fixtures/*.wav
+
+# HF model cache if it ever lands in-tree
+.cache/
+
+# Local Claude Code settings (machine-specific permissions)
+.claude/settings.local.json
+
+# OS / editor cruft
+Thumbs.db
+desktop.ini
+.DS_Store
+.vscode/
+.idea/

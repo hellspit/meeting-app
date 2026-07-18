@@ -1,0 +1,48 @@
+# Real-Time Meeting Answer Assistant - configuration
+# Copied/edited freely; all values have code defaults in src/config.py.
+
+overlay:
+  # Position/size on the target monitor (pixels). Placement is deterministic,
+  # never random (plan: default to primary monitor top-right-ish).
+  width: 460
+  height: 520
+  margin: 24            # gap from the monitor edge
+  anchor: top-right     # top-left | top-right | bottom-left | bottom-right
+  target_monitor: 0     # index into the screen list; 0 = primary
+  opacity: 0.92         # 0..1 window opacity
+  font_point_size: 12
+  click_through: false  # start with clicks passing through? (toggle via hotkey in M2)
+
+stt:
+  # OpenAI cloud transcription (audio leaves the machine). Local VAD still runs
+  # first so we only upload speech, not silence (saves cost + latency).
+  provider: openai
+  model: gpt-4o-mini-transcribe   # or gpt-4o-transcribe (higher quality) / whisper-1
+  language: en
+
+audio:
+  frame_ms: 30
+  target_sample_rate: 16000
+  silence_timeout_ms: 700
+  min_speech_ms: 250
+  max_utterance_s: 18
+  ring_buffer_seconds: 30   # drop-OLDEST on overflow + backlog status
+
+ai:
+  provider: openai
+  model: gpt-5.2                 # best available; supports vision (screen) + code
+  max_answer_tokens: 1500        # full answers, with gpt-5 reasoning-token headroom
+  max_context_tokens: 2500      # hard cap on context/*.md (visible truncation)
+  auto_answer: true              # auto-answer when the speaker stops (Ctrl+Alt+Space toggles)
+  auto_answer_delay_ms: 900      # how long they must stop talking before it answers
+
+screen:
+  # Screen analysis: Ctrl+Alt+S grabs the target monitor and asks GPT-4o vision.
+  # NOTE: this sends a screenshot of your screen to OpenAI.
+  enabled: true
+  target_monitor: 0
+  question: "Look at my screen and help me respond. What should I say?"
+
+privacy:
+  # No transcripts/answers to disk by default. debug logging is opt-in + redacted.
+  debug_content_logging: false

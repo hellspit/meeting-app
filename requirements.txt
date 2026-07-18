@@ -1,0 +1,48 @@
+# Real-Time Meeting Answer Assistant — known-good lock (Python 3.12, 64-bit, Windows 11)
+# Verified by scripts/check_env.py: 4/4 PASS on RTX 4050 Laptop (6 GB), driver 610.74.
+#
+# INSTALL ORDER MATTERS for the GPU stack. Recommended:
+#   py -3.12 -m venv .venv
+#   .\.venv\Scripts\python.exe -m pip install --upgrade pip
+#   .\.venv\Scripts\python.exe -m pip install -r requirements.txt
+#
+# NOTE ON torch: this is the CPU build (Silero VAD only — the GPU is owned by
+# faster-whisper via CTranslate2, NOT torch). The +cpu wheel comes from the
+# PyTorch CPU index below. Do NOT install a CUDA torch build.
+
+--extra-index-url https://download.pytorch.org/whl/cpu
+
+# --- Overlay UI -------------------------------------------------------------
+PySide6==6.11.1
+shiboken6==6.11.1
+
+# --- System audio (WASAPI loopback) ----------------------------------------
+PyAudioWPatch==0.2.12.8
+soundfile==0.14.0
+
+# --- VAD (CPU) --------------------------------------------------------------
+torch==2.13.0+cpu
+torchaudio==2.11.0
+silero-vad==6.2.1
+onnxruntime==1.27.0
+
+# --- Cloud STT + answers (OpenAI) ------------------------------------------
+# STT = audio.transcriptions (gpt-4o-mini-transcribe); answers = chat streaming.
+openai==2.45.0
+
+# --- Local STT (OPTIONAL) ---------------------------------------------------
+# Only needed if you switch stt.provider back to a local model. NOT used in the
+# current OpenAI-everything config; safe to skip installing these.
+#   faster-whisper==1.2.1
+#   ctranslate2==4.8.1
+#   nvidia-cublas-cu12==12.9.2.10
+#   nvidia-cudnn-cu12==9.24.0.43
+#   anthropic==0.116.0   # (only if you switch answers back to Claude)
+
+# --- Config / secrets / hotkey fallback ------------------------------------
+PyYAML==6.0.3
+python-dotenv==1.2.2
+pynput==1.8.2
+
+# --- Shared -----------------------------------------------------------------
+numpy==2.5.1
