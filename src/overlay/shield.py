@@ -27,9 +27,9 @@ from src.platform import (
 class ShieldResult:
     """Outcome of trying to shield a specific window."""
 
-    applied: bool          # did the OS accept the call we made?
-    verified: bool         # did we read the state back and confirm it?
-    hidden: bool           # is it actually hidden from a modern screen share?
+    applied: bool  # did the OS accept the call we made?
+    verified: bool  # did we read the state back and confirm it?
+    hidden: bool  # is it actually hidden from a modern screen share?
     detail: str
 
     @property
@@ -56,7 +56,9 @@ def _apply_windows(window) -> ShieldResult:
     user32.SetWindowDisplayAffinity.argtypes = [wintypes.HWND, wintypes.DWORD]
     user32.SetWindowDisplayAffinity.restype = wintypes.BOOL
     user32.GetWindowDisplayAffinity.argtypes = [
-        wintypes.HWND, ctypes.POINTER(wintypes.DWORD)]
+        wintypes.HWND,
+        ctypes.POINTER(wintypes.DWORD),
+    ]
     user32.GetWindowDisplayAffinity.restype = wintypes.BOOL
 
     hwnd = wintypes.HWND(int(window.winId()))
@@ -69,8 +71,11 @@ def _apply_windows(window) -> ShieldResult:
         applied=applied,
         verified=verified,
         hidden=hidden,
-        detail=("excluded from capture (0x11), confirmed by read-back" if hidden
-                else f"SetWindowDisplayAffinity did not take (mode=0x{mode.value:x})"),
+        detail=(
+            "excluded from capture (0x11), confirmed by read-back"
+            if hidden
+            else f"SetWindowDisplayAffinity did not take (mode=0x{mode.value:x})"
+        ),
     )
 
 
@@ -86,9 +91,11 @@ def _apply_macos(window) -> ShieldResult:
         from AppKit import NSWindowSharingNone
     except Exception as e:  # noqa: BLE001 - pyobjc missing or broken
         return ShieldResult(
-            applied=False, verified=False, hidden=False,
+            applied=False,
+            verified=False,
+            hidden=False,
             detail=f"pyobjc unavailable ({type(e).__name__}); no shield applied — "
-                   f"{cap.detail}",
+            f"{cap.detail}",
         )
 
     try:
@@ -102,7 +109,9 @@ def _apply_macos(window) -> ShieldResult:
         verified = int(ns_window.sharingType()) == int(NSWindowSharingNone)
     except Exception as e:  # noqa: BLE001
         return ShieldResult(
-            applied=False, verified=False, hidden=False,
+            applied=False,
+            verified=False,
+            hidden=False,
             detail=f"could not set NSWindow.sharingType ({type(e).__name__}: {e})",
         )
 
@@ -121,7 +130,9 @@ def _apply_macos(window) -> ShieldResult:
 def _apply_linux(window) -> ShieldResult:  # noqa: ARG001 - uniform signature
     cap = shield_capability()
     return ShieldResult(
-        applied=False, verified=False, hidden=False,
+        applied=False,
+        verified=False,
+        hidden=False,
         detail=f"no capture-exclusion mechanism on this platform — {cap.detail}",
     )
 

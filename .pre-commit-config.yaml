@@ -1,0 +1,23 @@
+# Optional but recommended: runs the same checks as CI before every commit.
+# Setup:
+#   pip install -r requirements-dev.txt
+#   pre-commit install
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+      - id: check-yaml
+      - id: check-added-large-files
+      - id: detect-private-key
+
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.15.22 # keep in sync with requirements-dev.txt
+    hooks:
+      - id: ruff
+
+  - repo: https://github.com/psf/black-pre-commit-mirror
+    rev: 25.11.0 # keep in sync with requirements-dev.txt
+    hooks:
+      - id: black

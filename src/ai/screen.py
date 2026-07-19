@@ -16,7 +16,7 @@ Uses `mss` for a fast grab and encodes a PNG as a base64 data URL in the chat
 from __future__ import annotations
 
 import base64
-from typing import Callable, Iterator
+from collections.abc import Callable, Iterator
 
 import mss
 import mss.tools
@@ -45,6 +45,7 @@ def _downscale_png_if_needed(png: bytes) -> bytes:
     """Best-effort shrink so the long edge <= MAX_EDGE. Falls back to original."""
     try:
         import io
+
         from PIL import Image  # Pillow may not be installed; optional
     except Exception:  # noqa: BLE001
         return png

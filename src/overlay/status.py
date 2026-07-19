@@ -38,12 +38,16 @@ class MeetingStatus(QWidget):
         layout.setSpacing(8)
 
         self._state = QLabel()
-        self._state.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
+        self._state.setAlignment(
+            Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter
+        )
         layout.addWidget(self._state)
         layout.addStretch(1)
 
         self._shield = QLabel()
-        self._shield.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+        self._shield.setAlignment(
+            Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter
+        )
         layout.addWidget(self._shield)
 
         self._backlog = False
@@ -63,7 +67,9 @@ class MeetingStatus(QWidget):
             self._shield.setStyleSheet(f"color:{_OK}; font-size:11px;")
         else:
             self._shield.setText("VISIBLE — not hidden")
-            self._shield.setStyleSheet(f"color:{_ERR}; font-size:11px; font-weight:600;")
+            self._shield.setStyleSheet(
+                f"color:{_ERR}; font-size:11px; font-weight:600;"
+            )
 
     def set_backlog(self, behind: bool) -> None:
         self._backlog = behind

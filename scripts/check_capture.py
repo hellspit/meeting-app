@@ -20,8 +20,8 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))  # import src.*
 
-from src.config import load_config
 from src.audio.capture import AudioCapture
+from src.config import load_config
 
 
 def _run_for(seconds: float) -> None:
@@ -33,8 +33,9 @@ def _run_for(seconds: float) -> None:
 def check_real_capture(cfg) -> tuple[bool, str]:
     events: list[tuple[str, str]] = []
     errors: list[str] = []
-    cap = AudioCapture(cfg, on_status=lambda f, s: events.append((f, s)),
-                       on_error=errors.append)
+    cap = AudioCapture(
+        cfg, on_status=lambda f, s: events.append((f, s)), on_error=errors.append
+    )
     cap.start()
     if errors:
         return False, errors[0]
@@ -46,8 +47,10 @@ def check_real_capture(cfg) -> tuple[bool, str]:
     secs = len(data) / bytes_per_sec if bytes_per_sec else 0
     got_active = ("capture", "active") in events
     ok = len(data) > 0 and got_active
-    detail = (f"device={cap.device_name!r} {cap.rate}Hz x{cap.channels}; "
-              f"captured {len(data)} bytes (~{secs:.1f}s); active_event={got_active}")
+    detail = (
+        f"device={cap.device_name!r} {cap.rate}Hz x{cap.channels}; "
+        f"captured {len(data)} bytes (~{secs:.1f}s); active_event={got_active}"
+    )
     return ok, detail
 
 
@@ -55,8 +58,12 @@ def check_drop_oldest(cfg) -> tuple[bool, str]:
     events: list[tuple[str, str]] = []
     errors: list[str] = []
     # Tiny buffer (~8 KB) and we never drain -> guaranteed overflow.
-    cap = AudioCapture(cfg, on_status=lambda f, s: events.append((f, s)),
-                       on_error=errors.append, ring_bytes_override=8000)
+    cap = AudioCapture(
+        cfg,
+        on_status=lambda f, s: events.append((f, s)),
+        on_error=errors.append,
+        ring_bytes_override=8000,
+    )
     cap.start()
     if errors:
         return False, errors[0]
@@ -77,8 +84,10 @@ def main() -> int:
     print("=" * 64)
 
     results = []
-    for name, fn in (("real capture", check_real_capture),
-                     ("drop-oldest / backlog", check_drop_oldest)):
+    for name, fn in (
+        ("real capture", check_real_capture),
+        ("drop-oldest / backlog", check_drop_oldest),
+    ):
         try:
             ok, detail = fn(cfg)
         except Exception as e:  # noqa: BLE001

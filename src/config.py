@@ -50,11 +50,11 @@ DEFAULTS: dict[str, Any] = {
     },
     "ai": {
         "provider": "openai",
-        "model": "gpt-5.2",            # best available; supports vision + code
-        "max_answer_tokens": 1500,     # full answers (+ gpt-5 reasoning headroom)
+        "model": "gpt-5.2",  # best available; supports vision + code
+        "max_answer_tokens": 1500,  # full answers (+ gpt-5 reasoning headroom)
         "max_context_tokens": 2500,
-        "auto_answer": True,           # answer automatically when they stop talking
-        "auto_answer_delay_ms": 900,   # silence to wait for before auto-answering
+        "auto_answer": True,  # answer automatically when they stop talking
+        "auto_answer_delay_ms": 900,  # silence to wait for before auto-answering
     },
     "screen": {
         "enabled": True,
@@ -104,7 +104,7 @@ def load_config(path: Path | None = None) -> Config:
         path = PROJECT_ROOT / "config.yaml"
     data = DEFAULTS
     if path.exists():
-        with open(path, "r", encoding="utf-8") as f:
+        with open(path, encoding="utf-8") as f:
             loaded = yaml.safe_load(f) or {}
         if not isinstance(loaded, dict):
             raise ValueError(f"{path} must contain a YAML mapping at top level")

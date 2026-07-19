@@ -1,0 +1,72 @@
+name: Security
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  schedule:
+    # Weekly re-scan: new CVEs and leak patterns surface without code changes.
+    - cron: "23 3 * * 1"
+
+permissions:
+  contents: read
+
+jobs:
+  secret-scan:
+    name: secret-scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # scan the full git history, not just the last commit
+      - name: Gitleaks (secrets in code and history)
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Free for personal-account repos. If this repo ever moves into a
+          # GitHub organization, gitleaks-action requires a license key:
+          # https://github.com/gitleaks/gitleaks-action#environment-variables
+
+  bandit:
+    name: bandit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: requirements-dev.txt
+      - name: Install tools
+        run: python -m pip install -r requirements-dev.txt
+      - name: Bandit (Python security lint, medium severity and up)
+        run: bandit -c pyproject.toml -r src scripts -ll
+
+  pip-audit:
+    name: pip-audit (${{ matrix.os }})
+    # requirements.txt splits the stack with sys_platform markers (Windows:
+    # PyAudioWPatch; macOS: sounddevice + pyobjc), and pip-audit resolves the
+    # file with pip before auditing — so audit on both platforms to cover both
+    # dependency sets. Windows/macOS runners are also free for public repos.
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: requirements-dev.txt
+      - name: Install tools
+        run: python -m pip install -r requirements-dev.txt
+      - name: Audit pinned dependencies against known vulnerabilities
+        # --no-deps audits the pins exactly as listed (everything active is
+        # ==-pinned). The sed strips torch's "+cpu" local version tag, which
+        # the vulnerability databases don't know about.
+        shell: bash
+        run: |
+          sed -E 's/\+cpu//g' requirements.txt > audit-requirements.txt
+          pip-audit --no-deps -r audit-requirements.txt

@@ -1,0 +1,28 @@
+name: CodeQL
+
+# GitHub's semantic code-scanning engine — free for public repos.
+# NOTE: do NOT also enable CodeQL "Default setup" in the repo's Settings →
+# Code security; the two conflict. This workflow IS the CodeQL setup.
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  schedule:
+    - cron: "41 4 * * 2"
+
+jobs:
+  analyze:
+    name: codeql
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write # upload findings to the repo's Security tab
+    steps:
+      - uses: actions/checkout@v4
+      - uses: github/codeql-action/init@v3
+        with:
+          languages: python
+      - uses: github/codeql-action/analyze@v3
+        with:
+          category: "/language:python"

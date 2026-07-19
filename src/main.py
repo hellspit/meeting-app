@@ -107,17 +107,57 @@ _FOLLOWUP_PROMPTS = {
     "deeper": "Go a bit deeper on that — add the key detail I might get asked next.",
     "example": "Explain that with a concrete example.",
     "code": "Show me the code for that, as plain pasteable lines.",
-    "natural": "Rephrase that to sound natural and conversational, like I'm just speaking.",
+    "natural": (
+        "Rephrase that to sound natural and conversational, like I'm just speaking."
+    ),
 }
 
 _Q_WORDS = {
-    "what", "what's", "why", "how", "when", "where", "who", "which", "whose",
-    "can", "could", "would", "will", "do", "does", "did", "is", "are", "should",
-    "tell", "explain", "describe", "define", "give", "walk", "have",
+    "what",
+    "what's",
+    "why",
+    "how",
+    "when",
+    "where",
+    "who",
+    "which",
+    "whose",
+    "can",
+    "could",
+    "would",
+    "will",
+    "do",
+    "does",
+    "did",
+    "is",
+    "are",
+    "should",
+    "tell",
+    "explain",
+    "describe",
+    "define",
+    "give",
+    "walk",
+    "have",
 }
-_Q_STARTS = ("tell me", "walk me", "how would", "what is", "what's", "can you",
-             "could you", "would you", "do you", "have you", "explain",
-             "describe", "give me", "what are", "why do", "how do")
+_Q_STARTS = (
+    "tell me",
+    "walk me",
+    "how would",
+    "what is",
+    "what's",
+    "can you",
+    "could you",
+    "would you",
+    "do you",
+    "have you",
+    "explain",
+    "describe",
+    "give me",
+    "what are",
+    "why do",
+    "how do",
+)
 
 
 def looks_like_question(text: str) -> bool:
@@ -136,9 +176,14 @@ def looks_like_question(text: str) -> bool:
 def _print_hotkey_help(hk: HotkeyManager) -> None:
     labels = hk.labels()
     print("Hotkeys (work even while the meeting app is focused):")
-    print(f"  answer spoken Q ..... {labels['answer_now']}  (or focus chat box if silent)")
+    print(
+        f"  answer spoken Q ..... {labels['answer_now']}  "
+        "(or focus chat box if silent)"
+    )
     print(f"  toggle auto-answer .. {labels['toggle_auto']}")
-    print(f"  prev / next answer .. {labels['history_prev']} / {labels['history_next']}")
+    print(
+        f"  prev / next answer .. {labels['history_prev']} / {labels['history_next']}"
+    )
     print(f"  analyze SCREEN ...... {labels['analyze_screen']}")
     print(f"  EMERGENCY ERASE ..... {labels['emergency_erase']}")
     print(f"  show / hide ......... {labels['toggle_visible']}")
@@ -146,8 +191,10 @@ def _print_hotkey_help(hk: HotkeyManager) -> None:
     print(f"  move ................ {labels['move_left']} / Right / Up / Down")
     print(f"  quit ................ {labels['quit']}")
     if hk.failures:
-        print(f"  [warn] failed to register (in use by another app?): "
-              f"{', '.join(hk.failures)}")
+        print(
+            f"  [warn] failed to register (in use by another app?): "
+            f"{', '.join(hk.failures)}"
+        )
     if hk.permission_hint:
         print()
         for i, line in enumerate(_wrap(hk.permission_hint, 68)):
@@ -156,15 +203,28 @@ def _print_hotkey_help(hk: HotkeyManager) -> None:
 
 def main() -> int:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--demo", action="store_true",
-                    help="inject placeholder content and healthy statuses")
-    ap.add_argument("--seconds", type=float, default=0.0,
-                    help="auto-quit after N seconds (0 = stay open)")
-    ap.add_argument("--hold", action="store_true",
-                    help="stay open (for a manual screen-share / hotkey test)")
-    ap.add_argument("--i-know-its-visible", action="store_true",
-                    help="run on a platform where the overlay CANNOT be hidden "
-                         "from screen capture (macOS/Linux)")
+    ap.add_argument(
+        "--demo",
+        action="store_true",
+        help="inject placeholder content and healthy statuses",
+    )
+    ap.add_argument(
+        "--seconds",
+        type=float,
+        default=0.0,
+        help="auto-quit after N seconds (0 = stay open)",
+    )
+    ap.add_argument(
+        "--hold",
+        action="store_true",
+        help="stay open (for a manual screen-share / hotkey test)",
+    )
+    ap.add_argument(
+        "--i-know-its-visible",
+        action="store_true",
+        help="run on a platform where the overlay CANNOT be hidden "
+        "from screen capture (macOS/Linux)",
+    )
     args = ap.parse_args()
 
     if not _check_capture_shield(args.i_know_its_visible):
@@ -199,6 +259,7 @@ def main() -> int:
     def get_client():
         if _client["c"] is None:
             from openai import OpenAI
+
             # max_retries: SDK retries transient errors (429 / 5xx / network)
             # with exponential backoff, so a blip doesn't kill the session.
             _client["c"] = OpenAI(max_retries=4)
@@ -390,8 +451,9 @@ def main() -> int:
             # Load the VAD (imports torch, ~1-2s) and start capture on a
             # BACKGROUND thread so the overlay is visible and interactive
             # immediately — status shows loading → ready as it comes up.
-            threading.Thread(target=pipeline.start, name="pipeline-start",
-                             daemon=True).start()
+            threading.Thread(
+                target=pipeline.start, name="pipeline-start", daemon=True
+            ).start()
         except Exception as e:  # noqa: BLE001 - e.g. missing key / no loopback
             print(f"[pipeline] not started: {type(e).__name__}: {e}")
 
@@ -440,8 +502,10 @@ def main() -> int:
     n_ok = len(hk.labels()) - len(hk.failures)
     shield = win.shield
     mark = "PASS" if win.affinity_ok and not hk.failures else "PARTIAL"
-    print(f"[{mark}] capture shield: {shield.status_label if shield else 'unknown'}; "
-          f"hotkeys: {n_ok}/{len(hk.labels())}")
+    print(
+        f"[{mark}] capture shield: {shield.status_label if shield else 'unknown'}; "
+        f"hotkeys: {n_ok}/{len(hk.labels())}"
+    )
     if shield is not None and not shield.hidden:
         print(f"        {shield.detail}")
     print("=" * 60)
