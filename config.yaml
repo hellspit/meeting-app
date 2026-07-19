@@ -27,6 +27,12 @@ audio:
   min_speech_ms: 250
   max_utterance_s: 18
   ring_buffer_seconds: 30   # drop-OLDEST on overflow + backlog status
+  # Pin capture to a device by name substring; empty = auto-detect.
+  # Windows: leave empty (WASAPI loopback is found automatically).
+  # macOS:   needs a virtual driver, e.g. "BlackHole"  (see README setup).
+  # Linux:   a PulseAudio/PipeWire monitor source, e.g. "monitor".
+  # List what's available with:  python scripts/check_audio.py --list
+  input_device: ""
 
 ai:
   provider: openai

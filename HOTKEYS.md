@@ -4,6 +4,11 @@ All hotkeys are **global**: they work even while Zoom / Teams / Meet is the
 focused window, so you never have to click the overlay (which would look
 obvious on a shared screen).
 
+> **On macOS**, `Alt` is the **Option** key — the app displays these as
+> `Ctrl+Opt+A` and so on. Global hotkeys also require **Accessibility**
+> permission (System Settings → Privacy & Security → Accessibility); without it
+> they silently never fire. The app warns you at startup when it detects this.
+
 | Hotkey | Action |
 |---|---|
 | **Ctrl + Alt + A** | **Answer the last spoken question** (from what it heard). If nothing was heard, jumps to the chat box so you can type. |
@@ -29,4 +34,9 @@ obvious on a shared screen).
 ### Notes
 - Answers are concise for concept questions and full (with code) when you ask it to write code.
 - It hears **output** audio (the other people through your speakers/headphones), not your own mic.
-- The overlay is hidden from screen sharing, but that is best-effort — verify in your meeting app.
+- **On Windows** the overlay is hidden from screen sharing, but that is
+  best-effort — verify in your meeting app.
+- **On macOS and Linux the overlay is NOT hidden.** No API exists to do it there,
+  so anyone you share your screen with can see the panel. The app refuses to
+  start unless you pass `--i-know-its-visible`, and then shows a permanent red
+  banner. See "Platform support" in the README.

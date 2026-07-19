@@ -43,6 +43,10 @@ DEFAULTS: dict[str, Any] = {
         # poll spins up a throwaway PyAudio which can be flaky. Opt in if you
         # frequently switch the default output while both devices stay present.
         "device_check_seconds": 0,
+        # Pin capture to a specific input device by name substring. Empty = auto
+        # (Windows: the loopback for your default output; macOS: a virtual driver
+        # such as BlackHole; Linux: a PulseAudio/PipeWire '.monitor' source).
+        "input_device": "",
     },
     "ai": {
         "provider": "openai",

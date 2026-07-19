@@ -1,14 +1,14 @@
-# Real-Time Meeting Answer Assistant — known-good lock (Python 3.12, 64-bit, Windows 11)
-# Verified by scripts/check_env.py: 4/4 PASS on RTX 4050 Laptop (6 GB), driver 610.74.
+# Real-Time Meeting Answer Assistant — dependencies (Python 3.12, 64-bit)
+# Verified on Windows 11 (RTX 4050 Laptop, driver 610.74) via scripts/check_env.py.
+# macOS support is structurally in place but UNVERIFIED on real hardware — see
+# README "Platform support". Markers keep each platform's stack separate.
 #
-# INSTALL ORDER MATTERS for the GPU stack. Recommended:
 #   py -3.12 -m venv .venv
-#   .\.venv\Scripts\python.exe -m pip install --upgrade pip
-#   .\.venv\Scripts\python.exe -m pip install -r requirements.txt
+#   .\.venv\Scripts\python.exe -m pip install --upgrade pip      # Windows
+#   ./.venv/bin/python -m pip install -r requirements.txt        # macOS/Linux
 #
-# NOTE ON torch: this is the CPU build (Silero VAD only — the GPU is owned by
-# faster-whisper via CTranslate2, NOT torch). The +cpu wheel comes from the
-# PyTorch CPU index below. Do NOT install a CUDA torch build.
+# NOTE ON torch: CPU build only (Silero VAD is the sole consumer; transcription
+# and answers are cloud calls). Do NOT install a CUDA torch build.
 
 --extra-index-url https://download.pytorch.org/whl/cpu
 
@@ -16,12 +16,20 @@
 PySide6==6.11.1
 shiboken6==6.11.1
 
-# --- System audio (WASAPI loopback) ----------------------------------------
-PyAudioWPatch==0.2.12.8
+# --- System audio capture ---------------------------------------------------
+# Windows: WASAPI loopback is native, no virtual device needed.
+PyAudioWPatch==0.2.12.8 ; sys_platform == "win32"
+# macOS/Linux: PortAudio via sounddevice. macOS additionally needs a virtual
+# audio driver (BlackHole) since it has no system loopback — see README.
+sounddevice==0.5.2 ; sys_platform != "win32"
 soundfile==0.14.0
 
 # --- VAD (CPU) --------------------------------------------------------------
-torch==2.13.0+cpu
+# The +cpu local version exists on Windows/Linux only; macOS wheels are already
+# CPU-only and carry no suffix. If pip can't resolve these on macOS, relax the
+# pin to `torch` / `torchaudio` — silero-vad is not version-sensitive here.
+torch==2.13.0+cpu ; sys_platform != "darwin"
+torch==2.13.0 ; sys_platform == "darwin"
 torchaudio==2.11.0
 silero-vad==6.2.1
 onnxruntime==1.27.0
@@ -29,6 +37,24 @@ onnxruntime==1.27.0
 # --- Cloud STT + answers (OpenAI) ------------------------------------------
 # STT = audio.transcriptions (gpt-4o-mini-transcribe); answers = chat streaming.
 openai==2.45.0
+
+# --- Screen analysis (Ctrl+Alt+S) ------------------------------------------
+mss==10.1.0
+Pillow==12.1.0          # optional: downscales screenshots before upload
+
+# --- macOS native integration ----------------------------------------------
+# NSWindow.sharingType (legacy capture blocking) + AXIsProcessTrusted() so we can
+# tell you when Accessibility permission is missing instead of failing silently.
+pyobjc-framework-Cocoa==11.1 ; sys_platform == "darwin"
+pyobjc-framework-ApplicationServices==11.1 ; sys_platform == "darwin"
+
+# --- Config / secrets / global hotkeys -------------------------------------
+PyYAML==6.0.3
+python-dotenv==1.2.2
+pynput==1.8.2           # global hotkey backend on macOS/Linux
+
+# --- Shared -----------------------------------------------------------------
+numpy==2.5.1
 
 # --- Local STT (OPTIONAL) ---------------------------------------------------
 # Only needed if you switch stt.provider back to a local model. NOT used in the
@@ -38,11 +64,3 @@ openai==2.45.0
 #   nvidia-cublas-cu12==12.9.2.10
 #   nvidia-cudnn-cu12==9.24.0.43
 #   anthropic==0.116.0   # (only if you switch answers back to Claude)
-
-# --- Config / secrets / hotkey fallback ------------------------------------
-PyYAML==6.0.3
-python-dotenv==1.2.2
-pynput==1.8.2
-
-# --- Shared -----------------------------------------------------------------
-numpy==2.5.1

@@ -15,9 +15,9 @@ Audio -> transcription (answer spoken questions automatically) lands in M4.
 from __future__ import annotations
 
 import argparse
-import ctypes
 import sys
 import threading
+import time
 from collections import deque
 
 from dotenv import load_dotenv
@@ -28,9 +28,11 @@ from src.ai.conversation import Conversation
 from src.ai.screen import capture_monitor_png
 from src.ai.worker import StreamWorker
 from src.config import load_config
+from src.core.instance import acquire_single_instance
 from src.core.pipeline import Pipeline
 from src.overlay.hotkeys import HotkeyManager
 from src.overlay.window import OverlayWindow
+from src.platform import os_name, shield_capability
 
 _DEMO_TRANSCRIPT = (
     "Them: Can you give us a quick status on the billing migration, and are we "
@@ -44,25 +46,59 @@ _DEMO_ANSWER = (
 )
 
 
-# Held for the process lifetime so the named mutex stays owned.
-_INSTANCE_MUTEX = None
-_ERROR_ALREADY_EXISTS = 183
+def _check_capture_shield(acknowledged: bool) -> bool:
+    """Gate startup on whether the overlay can actually be hidden.
 
-
-def _is_already_running() -> bool:
-    """True if another instance already owns the named mutex.
-
-    Global hotkeys are system-exclusive, so a second instance would fail to
-    register them and put a duplicate overlay on screen. This blocks that.
+    On Windows this passes silently. Everywhere else the overlay is visible to
+    anyone you share your screen with, and starting up as though it weren't
+    would be the single most damaging thing this program could do — so we refuse
+    unless the user has explicitly said they understand.
     """
-    global _INSTANCE_MUTEX
-    # Session-local namespace (no "Global\\") — needs no special privilege and
-    # is exactly the scope we want: one instance per logged-in user session.
-    _INSTANCE_MUTEX = ctypes.windll.kernel32.CreateMutexW(
-        None, False, "MeetingAssistantOverlay_singleinstance")
-    if not _INSTANCE_MUTEX:
-        return False  # couldn't create the mutex; don't block startup
-    return ctypes.windll.kernel32.GetLastError() == _ERROR_ALREADY_EXISTS
+    cap = shield_capability()
+    if cap.hides_from_screen_share:
+        return True
+
+    # Deliberately ASCII-only: this is the one message that must never render as
+    # mojibake in a terminal with a legacy code page.
+    if acknowledged:
+        print("=" * 62)
+        print("  WARNING: capture shield UNAVAILABLE - overlay IS visible")
+        print(f"  {os_name()}")
+        for line in _wrap(cap.detail, 58):
+            print(f"    {line}")
+        print("  Running anyway (--i-know-its-visible).")
+        print("=" * 62)
+        return True
+
+    print()
+    print("  REFUSING TO START")
+    print("  " + "-" * 40)
+    print(f"  Platform: {os_name()}")
+    print("  Capture shield: UNAVAILABLE")
+    print()
+    for line in _wrap(cap.detail, 46):
+        print(f"  {line}")
+    print()
+    print("  This overlay WILL be visible to everyone")
+    print("  if you share your screen.")
+    print()
+    print("  Re-run with --i-know-its-visible if that")
+    print("  is acceptable for your use case.")
+    print()
+    return False
+
+
+def _wrap(text: str, width: int) -> list[str]:
+    words, lines, cur = text.split(), [], ""
+    for w in words:
+        if cur and len(cur) + 1 + len(w) > width:
+            lines.append(cur)
+            cur = w
+        else:
+            cur = f"{cur} {w}".strip()
+    if cur:
+        lines.append(cur)
+    return lines
 
 
 # Follow-up quick actions: refine the CURRENT answer (uses conversation memory).
@@ -112,6 +148,10 @@ def _print_hotkey_help(hk: HotkeyManager) -> None:
     if hk.failures:
         print(f"  [warn] failed to register (in use by another app?): "
               f"{', '.join(hk.failures)}")
+    if hk.permission_hint:
+        print()
+        for i, line in enumerate(_wrap(hk.permission_hint, 68)):
+            print(f"  [!] {line}" if i == 0 else f"      {line}")
 
 
 def main() -> int:
@@ -122,9 +162,15 @@ def main() -> int:
                     help="auto-quit after N seconds (0 = stay open)")
     ap.add_argument("--hold", action="store_true",
                     help="stay open (for a manual screen-share / hotkey test)")
+    ap.add_argument("--i-know-its-visible", action="store_true",
+                    help="run on a platform where the overlay CANNOT be hidden "
+                         "from screen capture (macOS/Linux)")
     args = ap.parse_args()
 
-    if not args.demo and _is_already_running():
+    if not _check_capture_shield(args.i_know_its_visible):
+        return 2
+
+    if not args.demo and not acquire_single_instance():
         print("Meeting Assistant is already running (Ctrl+Alt+Q to quit it).")
         return 0
 
@@ -285,6 +331,27 @@ def main() -> int:
         win.set_transcript(f"You asked: {text}")
         stream_into_answer(lambda: conv.ask_stream(text))
 
+    def _grab_screen_png() -> bytes:
+        """Screenshot the target monitor, keeping the overlay out of the shot.
+
+        Where the capture shield works (Windows) the OS already excludes us. Where
+        it doesn't, the panel would land in its own screenshot and the model would
+        be looking at its own previous answer — so hide it for the grab.
+        """
+        idx = int(cfg.get("screen.target_monitor", 0))
+        must_hide = not win.affinity_ok and win.isVisible()
+        if not must_hide:
+            return capture_monitor_png(idx)
+        win.hide()
+        # Let the compositor actually take the window down before we grab.
+        QApplication.processEvents()
+        time.sleep(0.12)
+        try:
+            return capture_monitor_png(idx)
+        finally:
+            win.show()
+            QApplication.processEvents()
+
     def analyze_screen_action() -> None:
         if not cfg.get("screen.enabled", True):
             return
@@ -296,7 +363,7 @@ def main() -> int:
             win.set_status("claude", "error")
             return
         try:
-            png = capture_monitor_png(int(cfg.get("screen.target_monitor", 0)))
+            png = _grab_screen_png()
         except Exception as e:  # noqa: BLE001
             win.set_status("claude", "error")
             win.append_answer(f"\n[screenshot failed: {e}]")
@@ -369,11 +436,14 @@ def main() -> int:
     app.exec()
 
     print("=" * 60)
-    print("overlay + hotkeys + chat + screen analysis")
+    print(f"overlay + hotkeys + chat + screen analysis  ({os_name()})")
+    n_ok = len(hk.labels()) - len(hk.failures)
+    shield = win.shield
     mark = "PASS" if win.affinity_ok and not hk.failures else "PARTIAL"
-    print(f"[{mark}] capture shield: "
-          f"{'hidden (0x11)' if win.affinity_ok else 'FAILED'}; "
-          f"hotkeys: {len(hk.labels()) - len(hk.failures)}/{len(hk.labels())}")
+    print(f"[{mark}] capture shield: {shield.status_label if shield else 'unknown'}; "
+          f"hotkeys: {n_ok}/{len(hk.labels())}")
+    if shield is not None and not shield.hidden:
+        print(f"        {shield.detail}")
     print("=" * 60)
     return 0 if win.affinity_ok else 1
 

@@ -3,8 +3,11 @@
 Grabs a screenshot of the target monitor and asks the answer model what's on it,
 so suggestions can account for a shared slide, a coding prompt, a document, etc.
 
-The overlay window is excluded from OS capture (WDA_EXCLUDEFROMCAPTURE), so it
-does not appear in these screenshots — the model sees only what's underneath.
+On Windows the overlay is excluded from OS capture, so it does not appear in
+these screenshots — the model sees only what's underneath. Where that exclusion
+is unavailable (macOS/Linux), the caller hides the overlay for the duration of
+the grab instead; otherwise the model would be shown its own previous answer.
+See `_grab_screen_png` in src/main.py.
 
 Uses `mss` for a fast grab and encodes a PNG as a base64 data URL in the chat
 `image_url` content block (the standard OpenAI vision format).

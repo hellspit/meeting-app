@@ -1,75 +1,55 @@
-r"""M0b — screen-share hiding proof of concept.
+r"""Capture-shield check — can this platform hide the overlay from a screen share?
 
-Creates a small always-on-top PySide6 window, applies
-SetWindowDisplayAffinity(WDA_EXCLUDEFROMCAPTURE) once the native HWND exists,
-then reads it back with GetWindowDisplayAffinity to CONFIRM the OS accepted it.
-That read-back is the M0b gate (per plan.md).
+Creates a small always-on-top window, applies whatever capture exclusion the OS
+offers, and reports honestly.
 
-  Programmatic gate (this script): mode reads back as 0x11  -> PASS/FAIL, exit code.
-  Visual gate (M1, you do this):   share your screen and confirm the window is
-                                    invisible to the viewer. Run with --hold to
-                                    keep the window open for that test.
+  Programmatic gate: Windows sets WDA_EXCLUDEFROMCAPTURE and confirms it by
+                     read-back. macOS/Linux have no equivalent, so this reports
+                     UNAVAILABLE — that is the correct result, not a bug.
+  Visual gate:       share your screen and confirm for yourself. Run with --hold
+                     to keep the window up while you check.
 
-Run (auto-closes after a few seconds, prints result):
-    .venv\Scripts\python.exe scripts\check_affinity.py
-
-Run and keep open for a real screen-share test:
-    .venv\Scripts\python.exe scripts\check_affinity.py --hold
+Run:
+    python scripts/check_affinity.py
+    python scripts/check_affinity.py --hold
 """
 
 from __future__ import annotations
 
-import ctypes
 import sys
-from ctypes import wintypes
+from pathlib import Path
 
-from PySide6.QtCore import Qt, QTimer
-from PySide6.QtWidgets import QApplication, QLabel, QVBoxLayout, QWidget
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))  # import src.*
 
-WDA_NONE = 0x00
-WDA_EXCLUDEFROMCAPTURE = 0x11  # Windows 10 2004+ / Windows 11
+from PySide6.QtCore import Qt, QTimer  # noqa: E402
+from PySide6.QtWidgets import (  # noqa: E402
+    QApplication, QLabel, QVBoxLayout, QWidget,
+)
 
-_user32 = ctypes.windll.user32
-_user32.SetWindowDisplayAffinity.argtypes = [wintypes.HWND, wintypes.DWORD]
-_user32.SetWindowDisplayAffinity.restype = wintypes.BOOL
-_user32.GetWindowDisplayAffinity.argtypes = [wintypes.HWND, ctypes.POINTER(wintypes.DWORD)]
-_user32.GetWindowDisplayAffinity.restype = wintypes.BOOL
+from src.overlay.shield import apply_capture_shield  # noqa: E402
+from src.platform import os_name, shield_capability  # noqa: E402
 
 
-def apply_exclude_from_capture(hwnd: int) -> tuple[bool, int]:
-    """Set WDA_EXCLUDEFROMCAPTURE and read it back.
-
-    Returns (ok, mode) where ok means the set call succeeded AND the read-back
-    mode equals WDA_EXCLUDEFROMCAPTURE. `mode` is whatever the OS reports.
-    """
-    set_ok = bool(_user32.SetWindowDisplayAffinity(wintypes.HWND(hwnd), WDA_EXCLUDEFROMCAPTURE))
-    mode = wintypes.DWORD(0)
-    get_ok = bool(_user32.GetWindowDisplayAffinity(wintypes.HWND(hwnd), ctypes.byref(mode)))
-    ok = set_ok and get_ok and mode.value == WDA_EXCLUDEFROMCAPTURE
-    return ok, mode.value
-
-
-class AffinityProbe(QWidget):
+class ShieldProbe(QWidget):
     def __init__(self, hold: bool):
         super().__init__()
         self._hold = hold
         self._applied = False
-        self.result_ok = False
-        self.result_mode = -1
+        self.result = None
 
-        self.setWindowTitle("affinity-probe")
+        self.setWindowTitle("shield-probe")
         self.setWindowFlags(
             Qt.WindowType.FramelessWindowHint
             | Qt.WindowType.WindowStaysOnTopHint
             | Qt.WindowType.Tool  # keep it off the taskbar
         )
-        self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, False)
-        self.resize(360, 120)
+        self.resize(420, 150)
 
         self._label = QLabel("Applying capture exclusion…")
         self._label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self._label.setWordWrap(True)
         self._label.setStyleSheet(
-            "color: #eaeaea; background: #202225; font-size: 14px; padding: 12px;"
+            "color: #eaeaea; background: #202225; font-size: 13px; padding: 12px;"
             "border: 2px solid #4c8bf5; border-radius: 8px;"
         )
         layout = QVBoxLayout(self)
@@ -78,23 +58,23 @@ class AffinityProbe(QWidget):
 
     def showEvent(self, event):  # noqa: N802 (Qt override)
         super().showEvent(event)
-        # HWND is only valid after the window is actually shown. Apply once.
+        # The native handle is only valid after the window is shown. Apply once.
         if self._applied:
             return
         self._applied = True
-        hwnd = int(self.winId())
-        self.result_ok, self.result_mode = apply_exclude_from_capture(hwnd)
+        self.result = apply_capture_shield(self)
 
-        status = "HIDDEN (mode=0x%02x)" % self.result_mode if self.result_ok \
-            else "FAILED (mode=0x%02x)" % self.result_mode
+        status = "HIDDEN" if self.result.hidden else "NOT HIDDEN"
         if self._hold:
             self._label.setText(
-                f"Affinity: {status}\n\nShare your screen now.\n"
-                "You should see this window; the viewer should NOT.\n"
-                "Press Esc to close."
+                f"Capture shield: {status}\n\nShare your screen now.\n"
+                + ("You should see this window; the viewer should NOT."
+                   if self.result.hidden else
+                   "The viewer WILL see this window.")
+                + "\nPress Esc to close."
             )
         else:
-            self._label.setText(f"Affinity: {status}\nClosing…")
+            self._label.setText(f"Capture shield: {status}\nClosing…")
             # Quit explicitly: Qt.Tool windows are NOT counted toward
             # quitOnLastWindowClosed, so self.close() alone would hang exec().
             QTimer.singleShot(3000, QApplication.quit)
@@ -107,21 +87,26 @@ class AffinityProbe(QWidget):
 def main() -> int:
     hold = "--hold" in sys.argv[1:]
     app = QApplication(sys.argv)
-    probe = AffinityProbe(hold=hold)
+    probe = ShieldProbe(hold=hold)
     probe.show()
     app.exec()
 
-    print("=" * 60)
-    print("M0b - SetWindowDisplayAffinity read-back")
-    mark = "PASS" if probe.result_ok else "FAIL"
-    print(f"[{mark}] read-back mode = 0x%02x "
-          f"(expected 0x%02x = WDA_EXCLUDEFROMCAPTURE)"
-          % (probe.result_mode, WDA_EXCLUDEFROMCAPTURE))
-    if not probe.result_ok:
-        print("       The OS did not accept capture exclusion. Requires "
-              "Windows 10 2004+ / 11.")
-    print("=" * 60)
-    return 0 if probe.result_ok else 1
+    cap = shield_capability()
+    result = probe.result
+    print("=" * 66)
+    print(f"Capture shield — {os_name()}")
+    print("=" * 66)
+    mark = "PASS" if (result and result.hidden) else "UNAVAILABLE"
+    print(f"[{mark}] {result.detail if result else 'probe did not run'}")
+    print(f"        applied={result.applied if result else '?'} "
+          f"verified={result.verified if result else '?'}")
+    if not (result and result.hidden):
+        print()
+        print("        This platform cannot hide the overlay from a modern")
+        print("        screen share. The app will refuse to start unless you")
+        print("        pass --i-know-its-visible.")
+    print("=" * 66)
+    return 0 if (result and result.hidden) else 1
 
 
 if __name__ == "__main__":

@@ -1,19 +1,16 @@
-"""The capture-hidden overlay window.
+"""The overlay window.
 
-A frameless, always-on-top panel that shows the live transcript and Claude's
-streamed answer, with a status row along the bottom. It applies
-SetWindowDisplayAffinity(WDA_EXCLUDEFROMCAPTURE) so it renders on your physical
-screen but is excluded from most screen-capture paths (best-effort; see plan
-reality checks). The read-back drives the "Affinity: hidden / FAILED" status.
+A frameless, always-on-top panel that shows the live transcript and the streamed
+answer, with a status row along the bottom.
 
-Milestone M1: content is placeholder/manually driven. Audio -> STT -> Claude
-wiring arrives in later milestones via thread-safe signals.
+On Windows it applies SetWindowDisplayAffinity(WDA_EXCLUDEFROMCAPTURE), so it
+renders on your physical screen but is excluded from most screen-capture paths,
+confirmed by read-back. On macOS and Linux no such guarantee exists (see
+`src/platform`), and in that case the panel shows a permanent, unmissable banner
+saying so — a silently-visible overlay is the worst possible failure here.
 """
 
 from __future__ import annotations
-
-import ctypes
-from ctypes import wintypes
 
 from PySide6.QtCore import Qt, QTimer, Signal
 from PySide6.QtGui import QGuiApplication, QTextCursor
@@ -30,6 +27,7 @@ from PySide6.QtWidgets import (
 
 from src.config import Config
 from src.overlay.clickthrough import set_click_through
+from src.overlay.shield import ShieldResult, apply_capture_shield
 from src.overlay.status import MeetingStatus
 
 # Follow-up quick actions: button label -> action key emitted via `followup`.
@@ -40,27 +38,6 @@ FOLLOWUPS = [
     ("Code", "code"),
     ("Natural", "natural"),
 ]
-
-WDA_EXCLUDEFROMCAPTURE = 0x11  # Windows 10 2004+ / 11
-
-_user32 = ctypes.windll.user32
-_user32.SetWindowDisplayAffinity.argtypes = [wintypes.HWND, wintypes.DWORD]
-_user32.SetWindowDisplayAffinity.restype = wintypes.BOOL
-_user32.GetWindowDisplayAffinity.argtypes = [wintypes.HWND, ctypes.POINTER(wintypes.DWORD)]
-_user32.GetWindowDisplayAffinity.restype = wintypes.BOOL
-
-
-def apply_capture_shield(hwnd: int) -> bool:
-    """Exclude a window from screen capture and confirm via read-back.
-
-    Returns True only if the OS reports the affinity as WDA_EXCLUDEFROMCAPTURE.
-    """
-    set_ok = bool(_user32.SetWindowDisplayAffinity(
-        wintypes.HWND(hwnd), WDA_EXCLUDEFROMCAPTURE))
-    mode = wintypes.DWORD(0)
-    get_ok = bool(_user32.GetWindowDisplayAffinity(
-        wintypes.HWND(hwnd), ctypes.byref(mode)))
-    return set_ok and get_ok and mode.value == WDA_EXCLUDEFROMCAPTURE
 
 
 class OverlayWindow(QWidget):
@@ -74,6 +51,7 @@ class OverlayWindow(QWidget):
         self._cfg = cfg
         self._affinity_applied = False
         self.affinity_ok = False
+        self.shield: ShieldResult | None = None
         self._click_through = bool(cfg.get("overlay.click_through", False))
         self._demo_timer: QTimer | None = None
         self._nudge_px = 40
@@ -126,6 +104,19 @@ class OverlayWindow(QWidget):
         self._hint = QLabel("Meeting assistant")
         self._hint.setStyleSheet("color:#8b949e; font-size:11px;")
         layout.addWidget(self._hint)
+
+        # Shown only when the capture shield is NOT protecting this window.
+        # Deliberately loud: if this panel is visible to the call, you must know
+        # at a glance, not by remembering which OS you're on.
+        self._exposed_banner = QLabel("")
+        self._exposed_banner.setWordWrap(True)
+        self._exposed_banner.setStyleSheet(
+            "background: rgba(248, 81, 73, 55); color:#ff9492; "
+            "border:1px solid rgba(248,81,73,170); border-radius:7px; "
+            "padding:5px 8px; font-size:11px; font-weight:600;"
+        )
+        self._exposed_banner.setVisible(False)
+        layout.addWidget(self._exposed_banner)
 
         self._transcript = QTextEdit()
         self._transcript.setReadOnly(True)
@@ -219,14 +210,27 @@ class OverlayWindow(QWidget):
     # --- Capture shield ------------------------------------------------------
     def showEvent(self, event):  # noqa: N802 (Qt override)
         super().showEvent(event)
-        # HWND is valid only once shown. Apply once; reflect result in status.
+        # The native handle is valid only once shown. Apply once, then reflect
+        # the honest result in the status row and the exposure banner.
         if not self._affinity_applied:
             self._affinity_applied = True
-            self.affinity_ok = apply_capture_shield(int(self.winId()))
-            self._status.set_hidden(self.affinity_ok)
+            self._apply_shield()
             # Honor the configured starting click-through state.
-            set_click_through(int(self.winId()), self._click_through)
+            set_click_through(self, self._click_through)
             self._refresh_hint()
+
+    def _apply_shield(self) -> None:
+        """Apply the capture shield and surface exactly what we got."""
+        self.shield = apply_capture_shield(self)
+        self.affinity_ok = self.shield.hidden
+        self._status.set_hidden(self.shield.hidden)
+        if self.shield.hidden:
+            self._exposed_banner.setVisible(False)
+        else:
+            self._exposed_banner.setText(
+                "⚠  VISIBLE IN SCREEN SHARE — this panel is NOT hidden on this "
+                "platform. Anyone you share your screen with can see it.")
+            self._exposed_banner.setVisible(True)
 
     # --- Public API (driven by workers in later milestones) ------------------
     def set_transcript(self, text: str) -> None:
@@ -320,7 +324,10 @@ class OverlayWindow(QWidget):
 
     def toggle_click_through(self) -> None:
         self._click_through = not self._click_through
-        set_click_through(int(self.winId()), self._click_through)
+        # On non-Windows this recreates the native window, which discards any
+        # platform state attached to it — re-shield so we don't silently lose it.
+        if set_click_through(self, self._click_through) and self._affinity_applied:
+            self._apply_shield()
         self._refresh_hint()
 
     def nudge(self, direction: str) -> None:
