@@ -21,7 +21,7 @@ shiboken6==6.11.1
 PyAudioWPatch==0.2.12.8 ; sys_platform == "win32"
 # macOS/Linux: PortAudio via sounddevice. macOS additionally needs a virtual
 # audio driver (BlackHole) since it has no system loopback — see README.
-sounddevice==0.5.2 ; sys_platform != "win32"
+sounddevice==0.5.5 ; sys_platform != "win32"
 soundfile==0.14.0
 
 # --- VAD (CPU) --------------------------------------------------------------
