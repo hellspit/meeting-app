@@ -36,7 +36,7 @@ onnxruntime==1.27.0
 
 # --- Cloud STT + answers (OpenAI) ------------------------------------------
 # STT = audio.transcriptions (gpt-4o-mini-transcribe); answers = chat streaming.
-openai==2.45.0
+openai==2.46.0
 
 # --- Screen analysis (Ctrl+Alt+S) ------------------------------------------
 mss==10.1.0
