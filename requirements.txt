@@ -30,7 +30,7 @@ soundfile==0.14.0
 # pin to `torch` / `torchaudio` — silero-vad is not version-sensitive here.
 torch==2.13.0+cpu ; sys_platform != "darwin"
 torch==2.13.0 ; sys_platform == "darwin"
-torchaudio==2.11.0
+torchaudio==2.11.0+cpu
 silero-vad==6.2.1
 onnxruntime==1.27.0
 
