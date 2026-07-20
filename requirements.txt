@@ -40,7 +40,7 @@ openai==2.45.0
 
 # --- Screen analysis (Ctrl+Alt+S) ------------------------------------------
 mss==10.1.0
-Pillow==12.1.0          # optional: downscales screenshots before upload
+Pillow==12.3.0          # optional: downscales screenshots before upload
 
 # --- macOS native integration ----------------------------------------------
 # NSWindow.sharingType (legacy capture blocking) + AXIsProcessTrusted() so we can
