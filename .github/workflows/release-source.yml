@@ -1,0 +1,28 @@
+name: Release source
+
+# The release branch only ever advances by merging develop into it. This check
+# fails any PR into release whose head is not this repo's develop branch, and
+# is meant to be a required status check on the release branch ruleset.
+on:
+  pull_request:
+    branches: [release]
+
+permissions: {}
+
+jobs:
+  check:
+    name: release-source
+    runs-on: ubuntu-latest
+    steps:
+      - name: Only develop may be merged into release
+        env:
+          HEAD_REF: ${{ github.head_ref }}
+          HEAD_REPO: ${{ github.event.pull_request.head.repo.full_name }}
+          THIS_REPO: ${{ github.repository }}
+        run: |
+          if [[ "$HEAD_REPO" == "$THIS_REPO" && "$HEAD_REF" == "develop" ]]; then
+            echo "OK: release is being updated from develop."
+          else
+            echo "::error::Pull requests into 'release' may only come from this repo's 'develop' branch (got '$HEAD_REPO:$HEAD_REF')."
+            exit 1
+          fi
