@@ -1,7 +1,7 @@
 # Dev/CI tooling — the exact versions GitHub Actions runs (see .github/workflows/).
 # Install with:  pip install -r requirements-dev.txt
 ruff==0.15.22
-black==25.11.0
+black==26.5.1
 mypy==1.19.1
 types-PyYAML==6.0.12.20250915
 bandit==1.8.6
