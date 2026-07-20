@@ -13,8 +13,8 @@ from __future__ import annotations
 
 import ctypes
 import threading
+from collections.abc import Callable
 from ctypes import wintypes
-from typing import Callable
 
 from src.overlay.hotkeys import Binding
 
@@ -30,10 +30,19 @@ _MOD_FLAGS = {"alt": MOD_ALT, "ctrl": MOD_CONTROL, "shift": MOD_SHIFT}
 
 # Virtual-key codes for the keys our bindings use.
 _VK = {
-    "a": 0x41, "e": 0x45, "h": 0x48, "s": 0x53, "t": 0x54, "q": 0x51,
+    "a": 0x41,
+    "e": 0x45,
+    "h": 0x48,
+    "s": 0x53,
+    "t": 0x54,
+    "q": 0x51,
     "space": 0x20,
-    "left": 0x25, "up": 0x26, "right": 0x27, "down": 0x28,
-    "[": 0xDB, "]": 0xDD,
+    "left": 0x25,
+    "up": 0x26,
+    "right": 0x27,
+    "down": 0x28,
+    "[": 0xDB,
+    "]": 0xDD,
 }
 
 _user32 = ctypes.windll.user32
@@ -52,13 +61,28 @@ class _MSG(ctypes.Structure):
     ]
 
 
-_user32.RegisterHotKey.argtypes = [wintypes.HWND, ctypes.c_int, wintypes.UINT, wintypes.UINT]
+_user32.RegisterHotKey.argtypes = [
+    wintypes.HWND,
+    ctypes.c_int,
+    wintypes.UINT,
+    wintypes.UINT,
+]
 _user32.RegisterHotKey.restype = wintypes.BOOL
 _user32.UnregisterHotKey.argtypes = [wintypes.HWND, ctypes.c_int]
 _user32.UnregisterHotKey.restype = wintypes.BOOL
-_user32.GetMessageW.argtypes = [ctypes.POINTER(_MSG), wintypes.HWND, wintypes.UINT, wintypes.UINT]
+_user32.GetMessageW.argtypes = [
+    ctypes.POINTER(_MSG),
+    wintypes.HWND,
+    wintypes.UINT,
+    wintypes.UINT,
+]
 _user32.GetMessageW.restype = ctypes.c_int
-_user32.PostThreadMessageW.argtypes = [wintypes.DWORD, wintypes.UINT, wintypes.WPARAM, wintypes.LPARAM]
+_user32.PostThreadMessageW.argtypes = [
+    wintypes.DWORD,
+    wintypes.UINT,
+    wintypes.WPARAM,
+    wintypes.LPARAM,
+]
 _user32.PostThreadMessageW.restype = wintypes.BOOL
 
 
@@ -102,9 +126,9 @@ class Win32HotkeyBackend:
             if ret in (0, -1):  # WM_QUIT or error
                 break
             if msg.message == WM_HOTKEY:
-                action = self._id_to_action.get(int(msg.wParam))
-                if action:
-                    self._on_action(action)
+                hk_action = self._id_to_action.get(int(msg.wParam))
+                if hk_action:
+                    self._on_action(hk_action)
 
         for hk_id in list(self._id_to_action):
             _user32.UnregisterHotKey(None, hk_id)

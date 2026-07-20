@@ -30,13 +30,15 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))  # import src.*
 
-import numpy as np  # noqa: E402
+import numpy as np
 
-from src.audio.loopback import (  # noqa: E402
-    list_input_devices, open_loopback, setup_hint,
+from src.audio.loopback import (
+    list_input_devices,
+    open_loopback,
+    setup_hint,
 )
-from src.config import load_config  # noqa: E402
-from src.platform import os_name  # noqa: E402
+from src.config import load_config
+from src.platform import os_name
 
 # A frame ~= 30 ms of audio, matching the VAD frame size the pipeline uses.
 FRAME_MS = 30
@@ -69,17 +71,19 @@ def print_devices() -> int:
         print(f"  [{d['index']:>2}] {d['name']}  ({d['channels']} ch){tag}")
     print()
     print("Pin one by putting part of its name in config.yaml as")
-    print("audio.input_device, e.g.  input_device: \"BlackHole\"")
+    print('audio.input_device, e.g.  input_device: "BlackHole"')
     print("=" * 66)
     return 0
 
 
 def main() -> int:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--duration", type=float, default=15.0,
-                    help="seconds to run (default 15)")
-    ap.add_argument("--list", action="store_true",
-                    help="list capturable input devices and exit")
+    ap.add_argument(
+        "--duration", type=float, default=15.0, help="seconds to run (default 15)"
+    )
+    ap.add_argument(
+        "--list", action="store_true", help="list capturable input devices and exit"
+    )
     args = ap.parse_args()
 
     if args.list:
@@ -93,8 +97,10 @@ def main() -> int:
         print("=" * 66)
         print(f"Loopback level meter — {os_name()}")
         print(f"device : {stream.device_name}")
-        print(f"format : {stream.rate} Hz, {stream.channels} ch, float32, "
-              f"{FRAME_MS}ms frames")
+        print(
+            f"format : {stream.rate} Hz, {stream.channels} ch, float32, "
+            f"{FRAME_MS}ms frames"
+        )
         print(f"running: {args.duration:.0f}s - play some audio now")
         print("=" * 66)
     except Exception as e:  # noqa: BLE001
@@ -127,8 +133,10 @@ def main() -> int:
                 now = time.monotonic()
                 if now - last_print >= 0.5:  # periodic lines when redirected
                     last_print = now
-                    print(f"t={now - start:4.1f}s  rms {dbfs(rms):6.1f} dBFS  "
-                          f"peak {dbfs(peak):6.1f} dBFS")
+                    print(
+                        f"t={now - start:4.1f}s  rms {dbfs(rms):6.1f} dBFS  "
+                        f"peak {dbfs(peak):6.1f} dBFS"
+                    )
     except KeyboardInterrupt:
         pass
     finally:
@@ -139,8 +147,10 @@ def main() -> int:
     print("=" * 66)
     ok = dbfs(peak_seen) > SIGNAL_FLOOR_DBFS
     mark = "PASS" if ok else "FAIL"
-    print(f"[{mark}] max peak {dbfs(peak_seen):.1f} dBFS "
-          f"(floor {SIGNAL_FLOOR_DBFS:.0f} dBFS)")
+    print(
+        f"[{mark}] max peak {dbfs(peak_seen):.1f} dBFS "
+        f"(floor {SIGNAL_FLOOR_DBFS:.0f} dBFS)"
+    )
     if not ok:
         print("       No signal captured. Was audio actually playing through")
         print("       the device shown above?")

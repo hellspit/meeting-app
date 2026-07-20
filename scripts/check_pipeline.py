@@ -14,13 +14,12 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))  # import src.*
 
-import numpy as np  # noqa: E402
-import soundfile as sf  # noqa: E402
-from dotenv import load_dotenv  # noqa: E402
+import soundfile as sf
+from dotenv import load_dotenv
 
-from src.config import load_config  # noqa: E402
-from src.audio.vad import StreamingVAD  # noqa: E402
-from src.stt.transcriber import Transcriber  # noqa: E402
+from src.audio.vad import StreamingVAD
+from src.config import load_config
+from src.stt.transcriber import Transcriber
 
 FIXTURE = Path(__file__).parent / "fixtures" / "test.wav"
 EXPECTED = ("fox", "dog", "quick", "lazy", "brown")
@@ -40,6 +39,7 @@ def main() -> int:
 
     if sr != 16000:
         from src.audio.preprocess import resample
+
         data = resample(data, sr, 16000)
 
     vad = StreamingVAD(cfg)
@@ -47,7 +47,7 @@ def main() -> int:
     # Feed in ~100 ms chunks to exercise the streaming path.
     chunk = 1600
     for i in range(0, len(data), chunk):
-        utts.extend(vad.feed(data[i:i + chunk]))
+        utts.extend(vad.feed(data[i : i + chunk]))
     final = vad.flush_final()
     if final is not None:
         utts.append(final)
@@ -57,8 +57,12 @@ def main() -> int:
         return 1
 
     from openai import OpenAI
-    tr = Transcriber(OpenAI(), model=str(cfg.get("stt.model")),
-                     language=str(cfg.get("stt.language", "en")))
+
+    tr = Transcriber(
+        OpenAI(),
+        model=str(cfg.get("stt.model")),
+        language=str(cfg.get("stt.language", "en")),
+    )
     texts = []
     for i, utt in enumerate(utts):
         secs = len(utt) / 16000

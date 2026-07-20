@@ -13,7 +13,7 @@ Keep a reference to the returned StreamWorker until `done`/`failed` fires, or it
 from __future__ import annotations
 
 import threading
-from typing import Callable, Iterator
+from collections.abc import Callable, Iterator
 
 from PySide6.QtCore import QObject, Signal
 
@@ -28,7 +28,7 @@ class StreamWorker(QObject):
         self._factory = generator_factory
         self._thread: threading.Thread | None = None
 
-    def start(self) -> "StreamWorker":
+    def start(self) -> StreamWorker:
         self._thread = threading.Thread(target=self._run, daemon=True)
         self._thread.start()
         return self

@@ -21,13 +21,16 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))  # import src.*
 
-from PySide6.QtCore import Qt, QTimer  # noqa: E402
-from PySide6.QtWidgets import (  # noqa: E402
-    QApplication, QLabel, QVBoxLayout, QWidget,
+from PySide6.QtCore import Qt, QTimer
+from PySide6.QtWidgets import (
+    QApplication,
+    QLabel,
+    QVBoxLayout,
+    QWidget,
 )
 
-from src.overlay.shield import apply_capture_shield  # noqa: E402
-from src.platform import os_name, shield_capability  # noqa: E402
+from src.overlay.shield import ShieldResult, apply_capture_shield
+from src.platform import os_name
 
 
 class ShieldProbe(QWidget):
@@ -35,7 +38,7 @@ class ShieldProbe(QWidget):
         super().__init__()
         self._hold = hold
         self._applied = False
-        self.result = None
+        self.result: ShieldResult | None = None
 
         self.setWindowTitle("shield-probe")
         self.setWindowFlags(
@@ -62,15 +65,18 @@ class ShieldProbe(QWidget):
         if self._applied:
             return
         self._applied = True
-        self.result = apply_capture_shield(self)
+        result = apply_capture_shield(self)
+        self.result = result
 
-        status = "HIDDEN" if self.result.hidden else "NOT HIDDEN"
+        status = "HIDDEN" if result.hidden else "NOT HIDDEN"
         if self._hold:
             self._label.setText(
                 f"Capture shield: {status}\n\nShare your screen now.\n"
-                + ("You should see this window; the viewer should NOT."
-                   if self.result.hidden else
-                   "The viewer WILL see this window.")
+                + (
+                    "You should see this window; the viewer should NOT."
+                    if result.hidden
+                    else "The viewer WILL see this window."
+                )
                 + "\nPress Esc to close."
             )
         else:
@@ -91,15 +97,16 @@ def main() -> int:
     probe.show()
     app.exec()
 
-    cap = shield_capability()
     result = probe.result
     print("=" * 66)
     print(f"Capture shield — {os_name()}")
     print("=" * 66)
     mark = "PASS" if (result and result.hidden) else "UNAVAILABLE"
     print(f"[{mark}] {result.detail if result else 'probe did not run'}")
-    print(f"        applied={result.applied if result else '?'} "
-          f"verified={result.verified if result else '?'}")
+    print(
+        f"        applied={result.applied if result else '?'} "
+        f"verified={result.verified if result else '?'}"
+    )
     if not (result and result.hidden):
         print()
         print("        This platform cannot hide the overlay from a modern")

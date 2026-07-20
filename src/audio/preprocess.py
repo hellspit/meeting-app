@@ -16,7 +16,7 @@ TARGET_RATE = 16000
 def resample(mono: np.ndarray, sr_in: int, sr_out: int = TARGET_RATE) -> np.ndarray:
     if len(mono) == 0 or sr_in == sr_out:
         return mono.astype(np.float32, copy=False)
-    n_out = int(round(len(mono) * sr_out / sr_in))
+    n_out = round(len(mono) * sr_out / sr_in)
     if n_out <= 0:
         return np.zeros(0, dtype=np.float32)
     x_old = np.arange(len(mono), dtype=np.float64)
@@ -24,8 +24,9 @@ def resample(mono: np.ndarray, sr_in: int, sr_out: int = TARGET_RATE) -> np.ndar
     return np.interp(x_new, x_old, mono).astype(np.float32)
 
 
-def bytes_to_mono16k(raw: bytes, channels: int, rate_in: int,
-                     rate_out: int = TARGET_RATE) -> np.ndarray:
+def bytes_to_mono16k(
+    raw: bytes, channels: int, rate_in: int, rate_out: int = TARGET_RATE
+) -> np.ndarray:
     """Convert interleaved float32 loopback bytes to 16 kHz mono float32."""
     if not raw:
         return np.zeros(0, dtype=np.float32)

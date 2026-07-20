@@ -17,8 +17,9 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))  # import src.*
 
-from dotenv import load_dotenv  # noqa: E402
-from src.config import load_config  # noqa: E402
+from dotenv import load_dotenv
+
+from src.config import load_config
 
 FIXTURE = Path(__file__).parent / "fixtures" / "test.wav"
 
@@ -54,6 +55,7 @@ def main() -> int:
 
     try:
         from openai import OpenAI
+
         client = OpenAI()  # reads OPENAI_API_KEY from env
     except Exception as e:  # noqa: BLE001
         print(f"[FAIL] could not create OpenAI client: {type(e).__name__}: {e}")
@@ -70,7 +72,9 @@ def main() -> int:
     print(f"[{'PASS' if ok else 'FAIL'}] chat answers")
     print(f"       {detail}")
 
-    ok, detail = check_transcription(client, str(cfg.get("stt.model", "gpt-4o-mini-transcribe")))
+    ok, detail = check_transcription(
+        client, str(cfg.get("stt.model", "gpt-4o-mini-transcribe"))
+    )
     results.append(ok)
     print(f"[{'PASS' if ok else 'FAIL'}] transcription")
     print(f"       {detail}")

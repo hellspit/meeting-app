@@ -20,10 +20,16 @@ remap it in config.yaml under `hotkeys:` rather than editing this file, and use
 
 from __future__ import annotations
 
-from typing import Callable
+import contextlib
+from collections.abc import Callable
+from functools import partial
+from typing import TYPE_CHECKING
 
 from src.overlay.hotkeys import Binding
 from src.platform import IS_MACOS
+
+if TYPE_CHECKING:
+    from pynput import keyboard
 
 ACCESSIBILITY_HINT = (
     "macOS has not granted this process Accessibility permission, so global "
@@ -50,7 +56,7 @@ class PynputHotkeyBackend:
     def __init__(self, bindings: dict[str, Binding], on_action: Callable[[str], None]):
         self._bindings = bindings
         self._on_action = on_action
-        self._listener = None
+        self._listener: keyboard.GlobalHotKeys | None = None
         self.failures: list[str] = []
         self.permission_hint: str | None = None
 
@@ -76,8 +82,8 @@ class PynputHotkeyBackend:
             except Exception:  # noqa: BLE001 - unparseable chord for this backend
                 self.failures.append(binding.label())
                 continue
-            # Bind `action` per-iteration; a bare closure would capture the loop var.
-            mapping[spec] = (lambda a=action: self._on_action(a))
+            # partial binds `action` now; a bare closure would capture the loop var.
+            mapping[spec] = partial(self._on_action, action)
 
         if not mapping:
             return
@@ -88,12 +94,11 @@ class PynputHotkeyBackend:
             self._listener = None
             self.failures = [b.label() for b in self._bindings.values()]
             self.permission_hint = self.permission_hint or (
-                f"could not start global hotkey listener ({type(e).__name__}: {e})")
+                f"could not start global hotkey listener ({type(e).__name__}: {e})"
+            )
 
     def stop(self) -> None:
         if self._listener is not None:
-            try:
+            with contextlib.suppress(Exception):
                 self._listener.stop()
-            except Exception:  # noqa: BLE001
-                pass
             self._listener = None

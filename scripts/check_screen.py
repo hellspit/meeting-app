@@ -15,16 +15,19 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))  # import src.*
 
-from dotenv import load_dotenv  # noqa: E402
-from src.config import load_config  # noqa: E402
-from src.ai.screen import analyze_screen, capture_monitor_png  # noqa: E402
+from dotenv import load_dotenv
+
+from src.ai.screen import analyze_screen, capture_monitor_png
+from src.config import load_config
 
 
 def main() -> int:
     load_dotenv()
     cfg = load_config()
     model = str(cfg.get("ai.model", "gpt-4o"))
-    monitor = int(cfg.get("screen.target_monitor", cfg.get("overlay.target_monitor", 0)))
+    monitor = int(
+        cfg.get("screen.target_monitor", cfg.get("overlay.target_monitor", 0))
+    )
 
     print("=" * 64)
     print("Screen analysis check")
@@ -39,9 +42,12 @@ def main() -> int:
 
     try:
         from openai import OpenAI
+
         client = OpenAI()
         text = analyze_screen(
-            client, model, png,
+            client,
+            model,
+            png,
             question="In one or two sentences, what is currently on this screen?",
             max_tokens=120,
         )

@@ -17,6 +17,7 @@ Run:  python scripts/check_env.py
 
 from __future__ import annotations
 
+import contextlib
 import os
 import platform
 import sys
@@ -34,11 +35,11 @@ class CheckResult:
         self.ok = False
         self.detail = ""
 
-    def passed(self, detail: str) -> "CheckResult":
+    def passed(self, detail: str) -> CheckResult:
         self.ok, self.detail = True, detail
         return self
 
-    def failed(self, detail: str) -> "CheckResult":
+    def failed(self, detail: str) -> CheckResult:
         self.ok, self.detail = False, detail
         return self
 
@@ -102,12 +103,11 @@ def check_loopback_devices() -> CheckResult:
 
 def check_api_key() -> CheckResult:
     r = CheckResult("OPENAI_API_KEY present")
-    try:
+    # dotenv is optional for this check.
+    with contextlib.suppress(Exception):
         from dotenv import load_dotenv
 
         load_dotenv()
-    except Exception:  # noqa: BLE001 - dotenv optional for this check
-        pass
     key = os.environ.get("OPENAI_API_KEY", "").strip()
     if not key:
         return r.failed("not set. Copy .env.example to .env and paste your key.")
@@ -129,8 +129,10 @@ def report_shield() -> None:
 def main() -> int:
     print("=" * 68)
     print("environment & device checks")
-    print(f"Python {platform.python_version()} ({platform.architecture()[0]}) "
-          f"on {platform.system()} {platform.release()}")
+    print(
+        f"Python {platform.python_version()} ({platform.architecture()[0]}) "
+        f"on {platform.system()} {platform.release()}"
+    )
     print(f"Executable: {sys.executable}")
     if not FIXTURE.exists():
         print(f"\nFATAL: fixture not found at {FIXTURE}")

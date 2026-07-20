@@ -13,8 +13,8 @@ touched on the main thread.
 from __future__ import annotations
 
 import threading
-import time
 from concurrent.futures import ThreadPoolExecutor
+from typing import TYPE_CHECKING
 
 from PySide6.QtCore import QObject, Signal
 
@@ -23,13 +23,16 @@ from src.audio.preprocess import bytes_to_mono16k
 from src.config import Config
 from src.stt.transcriber import Transcriber
 
+if TYPE_CHECKING:
+    from src.audio.vad import StreamingVAD
+
 # NOTE: src.audio.vad (and thus torch) is imported lazily in start(), off the
 # UI thread, so launching the app doesn't pay the ~1-2s torch import up front.
 
 
 class Pipeline(QObject):
-    status = Signal(str, str)   # (field, state) for the overlay status row
-    transcript = Signal(str)    # a completed transcribed utterance
+    status = Signal(str, str)  # (field, state) for the overlay status row
+    transcript = Signal(str)  # a completed transcribed utterance
     error = Signal(str)
 
     def __init__(self, cfg: Config, client):
@@ -54,6 +57,7 @@ class Pipeline(QObject):
         self.status.emit("stt", "loading")
         try:
             from src.audio.vad import StreamingVAD  # imports torch (deferred)
+
             self.vad = StreamingVAD(self._cfg)  # loads Silero (CPU)
         except Exception as e:  # noqa: BLE001
             self.status.emit("stt", "error")
@@ -67,7 +71,7 @@ class Pipeline(QObject):
         self._thread.start()
 
     def _run(self) -> None:
-        assert self.vad is not None
+        assert self.vad is not None  # noqa: S101
         while not self._stop.is_set():
             raw = self.capture.read()
             if raw:

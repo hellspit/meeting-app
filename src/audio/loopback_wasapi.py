@@ -7,12 +7,14 @@ open the loopback device that matches the current default output.
 
 from __future__ import annotations
 
+import contextlib
+
 import pyaudiowpatch as pyaudio
 
 SAMPLE_FORMAT_BYTES = 4  # paFloat32
 
 
-def resolve_loopback_device(p: "pyaudio.PyAudio") -> dict:
+def resolve_loopback_device(p: pyaudio.PyAudio) -> dict:
     """Loopback device matching the current default output endpoint."""
     wasapi = p.get_host_api_info_by_type(pyaudio.paWASAPI)
     default_out = p.get_device_info_by_index(wasapi["defaultOutputDevice"])
@@ -41,15 +43,15 @@ def current_default_output_name() -> str | None:
         return None
     finally:
         if p is not None:
-            try:
+            with contextlib.suppress(Exception):
                 p.terminate()
-            except Exception:  # noqa: BLE001
-                pass
 
 
 def setup_hint() -> str:
-    return ("No WASAPI loopback device was found. This is unusual on Windows — "
-            "check that your default output device is working.")
+    return (
+        "No WASAPI loopback device was found. This is unusual on Windows — "
+        "check that your default output device is working."
+    )
 
 
 def list_input_devices() -> list[dict]:
@@ -61,21 +63,21 @@ def list_input_devices() -> list[dict]:
         for i in range(p.get_device_count()):
             info = p.get_device_info_by_index(i)
             if int(info.get("maxInputChannels", 0)) > 0:
-                out.append({
-                    "index": i,
-                    "name": str(info["name"]),
-                    "channels": int(info["maxInputChannels"]),
-                    "loopback": bool(info.get("isLoopbackDevice", False)),
-                })
+                out.append(
+                    {
+                        "index": i,
+                        "name": str(info["name"]),
+                        "channels": int(info["maxInputChannels"]),
+                        "loopback": bool(info.get("isLoopbackDevice", False)),
+                    }
+                )
         return out
     except Exception:  # noqa: BLE001
         return []
     finally:
         if p is not None:
-            try:
+            with contextlib.suppress(Exception):
                 p.terminate()
-            except Exception:  # noqa: BLE001
-                pass
 
 
 class WasapiLoopbackStream:
@@ -85,7 +87,7 @@ class WasapiLoopbackStream:
         self._cfg = cfg
         self._override = device_name_override
         self._pa: pyaudio.PyAudio | None = None
-        self._stream = None
+        self._stream: pyaudio.Stream | None = None
         self.rate = 0
         self.channels = 0
         self.device_name = ""
@@ -100,13 +102,17 @@ class WasapiLoopbackStream:
         if self._override:
             for i in range(self._pa.get_device_count()):
                 info = self._pa.get_device_info_by_index(i)
-                if self._override.lower() in str(info["name"]).lower() \
-                        and int(info["maxInputChannels"]) > 0:
+                if (
+                    self._override.lower() in str(info["name"]).lower()
+                    and int(info["maxInputChannels"]) > 0
+                ):
                     dev = info
                     break
             if dev is None:
                 raise RuntimeError(
-                    f"audio.input_device {self._override!r} not found among input devices")
+                    f"audio.input_device {self._override!r} not found "
+                    "among input devices"
+                )
         if dev is None:
             dev = resolve_loopback_device(self._pa)
 
@@ -116,7 +122,8 @@ class WasapiLoopbackStream:
 
         wasapi = self._pa.get_host_api_info_by_type(pyaudio.paWASAPI)
         self.default_output_name = self._pa.get_device_info_by_index(
-            wasapi["defaultOutputDevice"])["name"]
+            wasapi["defaultOutputDevice"]
+        )["name"]
 
         frames_per_buffer = max(1, int(self.rate * frame_ms / 1000))
         self._stream = self._pa.open(
@@ -131,27 +138,23 @@ class WasapiLoopbackStream:
 
     def read(self, frames: int) -> bytes:
         """Read interleaved float32 bytes. Raises OSError if the device is lost."""
+        if self._stream is None:
+            raise OSError("stream is not open")
         return self._stream.read(frames, exception_on_overflow=False)
 
     def stop(self) -> None:
         """Unblock a pending read so the worker thread can exit safely."""
         if self._stream is not None:
-            try:
+            with contextlib.suppress(Exception):
                 self._stream.stop_stream()
-            except Exception:  # noqa: BLE001
-                pass
 
     def close(self) -> None:
         if self._stream is not None:
-            try:
+            with contextlib.suppress(Exception):
                 self._stream.stop_stream()
                 self._stream.close()
-            except Exception:  # noqa: BLE001
-                pass
             self._stream = None
         if self._pa is not None:
-            try:
+            with contextlib.suppress(Exception):
                 self._pa.terminate()
-            except Exception:  # noqa: BLE001
-                pass
             self._pa = None

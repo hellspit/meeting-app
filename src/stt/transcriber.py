@@ -16,8 +16,14 @@ SR = 16000
 
 # Whisper-family models sometimes emit these on near-silence; drop them.
 _HALLUCINATIONS = {
-    "you", "thank you.", "thanks for watching!", "thank you for watching.",
-    ".", ". .", "bye.", "you.",
+    "you",
+    "thank you.",
+    "thanks for watching!",
+    "thank you for watching.",
+    ".",
+    ". .",
+    "bye.",
+    "you.",
 }
 
 

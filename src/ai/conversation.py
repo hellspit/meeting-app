@@ -11,7 +11,7 @@ the user can read aloud — including real code for technical questions.
 
 from __future__ import annotations
 
-from typing import Iterator
+from collections.abc import Iterator
 
 from src.ai.screen import _data_url, _downscale_png_if_needed
 
@@ -48,8 +48,9 @@ MAX_HISTORY_MESSAGES = 24
 
 
 class Conversation:
-    def __init__(self, client, model: str, max_tokens: int = 900,
-                 system: str | None = None):
+    def __init__(
+        self, client, model: str, max_tokens: int = 900, system: str | None = None
+    ):
         self.client = client
         self.model = model
         self.max_tokens = max_tokens
@@ -58,14 +59,18 @@ class Conversation:
 
     def add_screen(self, png: bytes, note: str | None = None) -> None:
         """Attach a screenshot as context for subsequent questions."""
-        self.messages.append({
-            "role": "user",
-            "content": [
-                {"type": "text", "text": note or "Here is my current screen."},
-                {"type": "image_url",
-                 "image_url": {"url": _data_url(_downscale_png_if_needed(png))}},
-            ],
-        })
+        self.messages.append(
+            {
+                "role": "user",
+                "content": [
+                    {"type": "text", "text": note or "Here is my current screen."},
+                    {
+                        "type": "image_url",
+                        "image_url": {"url": _data_url(_downscale_png_if_needed(png))},
+                    },
+                ],
+            }
+        )
         self._trim()
 
     def ask_stream(self, question: str) -> Iterator[str]:
@@ -95,4 +100,4 @@ class Conversation:
         if len(self.messages) <= MAX_HISTORY_MESSAGES:
             return
         # Keep system + the most recent (MAX_HISTORY_MESSAGES - 1) messages.
-        self.messages = [self._system] + self.messages[-(MAX_HISTORY_MESSAGES - 1):]
+        self.messages = [self._system, *self.messages[-(MAX_HISTORY_MESSAGES - 1) :]]

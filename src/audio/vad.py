@@ -31,7 +31,9 @@ class StreamingVAD:
     def __init__(self, cfg: Config, threshold: float = 0.5):
         self.threshold = threshold
         self.min_speech = int(cfg.get("audio.min_speech_ms", 250)) * SR // 1000
-        self.silence_timeout = int(cfg.get("audio.silence_timeout_ms", 700)) * SR // 1000
+        self.silence_timeout = (
+            int(cfg.get("audio.silence_timeout_ms", 700)) * SR // 1000
+        )
         self.max_utt = int(cfg.get("audio.max_utterance_s", 18)) * SR
         pad_ms = 96
         self._pad_frames = max(1, pad_ms * SR // 1000 // WINDOW)
@@ -56,9 +58,10 @@ class StreamingVAD:
         self._tail = data[n:].copy()
         with torch.no_grad():
             for i in range(0, n, WINDOW):
-                frame = data[i:i + WINDOW]
-                prob = float(self.model(
-                    torch.from_numpy(np.ascontiguousarray(frame)), SR).item())
+                frame = data[i : i + WINDOW]
+                prob = float(
+                    self.model(torch.from_numpy(np.ascontiguousarray(frame)), SR).item()
+                )
                 self._step(frame, prob >= self.threshold, out)
         return out
 

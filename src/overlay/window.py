@@ -61,7 +61,7 @@ class OverlayWindow(QWidget):
         self._view = 0
         self._streaming = False
         # State inputs for the meeting status resolver.
-        self._capture: bool | None = None   # None=unknown, True=on, False=off
+        self._capture: bool | None = None  # None=unknown, True=on, False=off
         self._stt_ready = False
         self._answering = False
         self._question_pending = False
@@ -136,12 +136,15 @@ class OverlayWindow(QWidget):
 
         self._answer_label = QLabel("Suggested answer")
         self._answer_label.setStyleSheet(
-            "color:#58a6ff; font-size:11px; font-weight:600;")
+            "color:#58a6ff; font-size:11px; font-weight:600;"
+        )
         layout.addWidget(self._answer_label)
 
         self._answer = QTextEdit()
         self._answer.setReadOnly(True)
-        self._answer.setPlaceholderText("Press the answer-now hotkey during a question…")
+        self._answer.setPlaceholderText(
+            "Press the answer-now hotkey during a question…"
+        )
         self._answer.setStyleSheet(
             "QTextEdit { background: transparent; color:#e6edf3; border:none; "
             f"font-size:{font_pt}pt; }}"
@@ -229,7 +232,8 @@ class OverlayWindow(QWidget):
         else:
             self._exposed_banner.setText(
                 "⚠  VISIBLE IN SCREEN SHARE — this panel is NOT hidden on this "
-                "platform. Anyone you share your screen with can see it.")
+                "platform. Anyone you share your screen with can see it."
+            )
             self._exposed_banner.setVisible(True)
 
     # --- Public API (driven by workers in later milestones) ------------------
@@ -388,10 +392,12 @@ class OverlayWindow(QWidget):
         self._resolve_state()
         answer = self._answer.toPlainText().strip()
         if answer:
-            self._answers.append({
-                "transcript": self._transcript.toPlainText(),
-                "answer": self._answer.toPlainText(),
-            })
+            self._answers.append(
+                {
+                    "transcript": self._transcript.toPlainText(),
+                    "answer": self._answer.toPlainText(),
+                }
+            )
             self._view = len(self._answers) - 1
         self._update_answer_label()
 

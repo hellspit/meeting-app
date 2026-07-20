@@ -16,13 +16,25 @@ the meeting would be both useless and a privacy surprise).
 
 from __future__ import annotations
 
+import contextlib
+from typing import TYPE_CHECKING
+
 import numpy as np
 
 from src.platform import IS_MACOS
 
+if TYPE_CHECKING:
+    import sounddevice as sd
+
 # Substrings that identify a loopback-capable input, most preferred first.
-_MACOS_CANDIDATES = ("blackhole", "loopback audio", "soundflower",
-                     "existential audio", "multi-output", "aggregate")
+_MACOS_CANDIDATES = (
+    "blackhole",
+    "loopback audio",
+    "soundflower",
+    "existential audio",
+    "multi-output",
+    "aggregate",
+)
 _LINUX_CANDIDATES = ("monitor",)
 
 MAX_CHANNELS = 2  # we downmix to mono anyway; no need to haul 16 aggregate channels
@@ -65,13 +77,15 @@ def list_input_devices() -> list[dict]:
     for idx, info in enumerate(sd.query_devices()):
         if int(info.get("max_input_channels", 0)) > 0:
             name = str(info["name"])
-            out.append({
-                **info,
-                "index": idx,
-                "name": name,
-                "channels": int(info["max_input_channels"]),
-                "loopback": any(c in name.lower() for c in _candidates()),
-            })
+            out.append(
+                {
+                    **info,
+                    "index": idx,
+                    "name": name,
+                    "channels": int(info["max_input_channels"]),
+                    "loopback": any(c in name.lower() for c in _candidates()),
+                }
+            )
     return out
 
 
@@ -86,7 +100,9 @@ def _pick_device(override: str | None) -> dict:
                 return d
         names = ", ".join(repr(str(d["name"])) for d in devices)
         raise RuntimeError(
-            f"audio.input_device {override!r} matched no input device. Available: {names}")
+            f"audio.input_device {override!r} matched no input device. "
+            f"Available: {names}"
+        )
 
     for needle in _candidates():
         for d in devices:
@@ -117,7 +133,7 @@ class SounddeviceLoopbackStream:
     def __init__(self, cfg, device_name_override: str | None = None):
         self._cfg = cfg
         self._override = device_name_override
-        self._stream = None
+        self._stream: sd.InputStream | None = None
         self.rate = 0
         self.channels = 0
         self.device_name = ""
@@ -149,6 +165,8 @@ class SounddeviceLoopbackStream:
         """Read interleaved float32 bytes. Raises OSError if the device is lost."""
         import sounddevice as sd
 
+        if self._stream is None:
+            raise OSError("stream is not open")
         try:
             data, _overflowed = self._stream.read(frames)
         except sd.PortAudioError as e:
@@ -161,16 +179,12 @@ class SounddeviceLoopbackStream:
     def stop(self) -> None:
         """Unblock a pending read so the worker thread can exit safely."""
         if self._stream is not None:
-            try:
+            with contextlib.suppress(Exception):
                 self._stream.abort()
-            except Exception:  # noqa: BLE001
-                pass
 
     def close(self) -> None:
         if self._stream is not None:
-            try:
+            with contextlib.suppress(Exception):
                 self._stream.abort()
                 self._stream.close()
-            except Exception:  # noqa: BLE001
-                pass
             self._stream = None

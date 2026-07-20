@@ -17,11 +17,16 @@ Status/errors are reported via plain callbacks so this module stays Qt-agnostic.
 
 from __future__ import annotations
 
+import contextlib
 import threading
 from collections import deque
-from typing import Callable
+from collections.abc import Callable
 
-from src.audio.loopback import current_default_output_name, open_loopback
+from src.audio.loopback import (
+    LoopbackStream,
+    current_default_output_name,
+    open_loopback,
+)
 from src.config import Config
 
 StatusCb = Callable[[str, str], None]
@@ -67,16 +72,20 @@ class AudioCapture:
 
     SAMPLE_BYTES = 4  # float32
 
-    def __init__(self, cfg: Config, on_status: StatusCb | None = None,
-                 on_error: ErrorCb | None = None,
-                 ring_bytes_override: int | None = None):
+    def __init__(
+        self,
+        cfg: Config,
+        on_status: StatusCb | None = None,
+        on_error: ErrorCb | None = None,
+        ring_bytes_override: int | None = None,
+    ):
         self._cfg = cfg
         self._on_status = on_status or (lambda *_: None)
         self._on_error = on_error or (lambda *_: None)
         self._ring_bytes_override = ring_bytes_override
         self._device_check_s = float(cfg.get("audio.device_check_seconds", 0))
 
-        self._stream = None
+        self._stream: LoopbackStream | None = None
         self._thread: threading.Thread | None = None
         self._stop = threading.Event()
         self._backlog = False
@@ -109,7 +118,8 @@ class AudioCapture:
 
             secs = float(self._cfg.get("audio.ring_buffer_seconds", 30))
             ring_bytes = self._ring_bytes_override or int(
-                secs * self.rate * self.channels * self.SAMPLE_BYTES)
+                secs * self.rate * self.channels * self.SAMPLE_BYTES
+            )
             self.ring = RingBuffer(ring_bytes)
             self.last_error = None
             return True
@@ -143,8 +153,13 @@ class AudioCapture:
     def _run(self) -> None:
         frames_since_check = 0
         while not self._stop.is_set():
+            stream = self._stream
+            if stream is None:
+                # Only possible if stop was requested while recovery was still
+                # failing; the loop condition exits on the next check.
+                continue
             try:
-                raw = self._stream.read(self._frames_per_buffer)
+                raw = stream.read(self._frames_per_buffer)
             except OSError as e:
                 # Device unplugged / disconnected mid-meeting → recover.
                 if self._stop.is_set():
@@ -160,8 +175,14 @@ class AudioCapture:
 
             if self._device_check_s > 0:
                 frames_since_check += 1
-                check_every = max(1, int(self.rate * self._device_check_s
-                                         / max(1, self._frames_per_buffer)))
+                check_every = max(
+                    1,
+                    int(
+                        self.rate
+                        * self._device_check_s
+                        / max(1, self._frames_per_buffer)
+                    ),
+                )
                 if frames_since_check >= check_every:
                     frames_since_check = 0
                     self._maybe_follow_default_change()
@@ -199,8 +220,6 @@ class AudioCapture:
 
     def _teardown_stream(self) -> None:
         if self._stream is not None:
-            try:
+            with contextlib.suppress(Exception):
                 self._stream.close()
-            except Exception:  # noqa: BLE001
-                pass
             self._stream = None

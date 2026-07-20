@@ -28,3 +28,6 @@ desktop.ini
 .DS_Store
 .vscode/
 .idea/
+
+# temp folder, intermediate files, not to push to remote
+temp/
