@@ -5,9 +5,9 @@ name: CodeQL
 # Code security; the two conflict. This workflow IS the CodeQL setup.
 on:
   push:
-    branches: [main]
+    branches: [develop, release]
   pull_request:
-    branches: [main]
+    branches: [develop, release]
   schedule:
     - cron: "41 4 * * 2"
 

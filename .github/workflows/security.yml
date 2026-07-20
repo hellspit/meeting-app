@@ -2,7 +2,7 @@ name: Security
 
 on:
   push:
-    branches: [main]
+    branches: [develop, release]
   pull_request:
   schedule:
     # Weekly re-scan: new CVEs and leak patterns surface without code changes.
