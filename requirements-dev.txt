@@ -5,5 +5,5 @@ black==25.11.0
 mypy==1.19.1
 types-PyYAML==6.0.12.20250915
 bandit==1.8.6
-pip-audit==2.9.0
+pip-audit==2.10.1
 pre-commit==4.3.0
