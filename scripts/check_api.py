@@ -29,9 +29,10 @@ def check_chat(client, model: str) -> tuple[bool, str]:
         resp = client.chat.completions.create(
             model=model,
             messages=[{"role": "user", "content": "Reply with the word OK."}],
-            max_tokens=1,
+            max_completion_tokens=64,
         )
-        _ = resp.choices[0].message.content
+        if not resp.choices[0].message.content:
+            return False, f"model {model!r} returned no answer"
         return True, f"model {model!r} responded"
     except Exception as e:  # noqa: BLE001
         return False, f"{type(e).__name__}: {e}"
@@ -56,7 +57,7 @@ def main() -> int:
     try:
         from openai import OpenAI
 
-        client = OpenAI()  # reads OPENAI_API_KEY from env
+        client = OpenAI(timeout=25.0, max_retries=1)
     except Exception as e:  # noqa: BLE001
         print(f"[FAIL] could not create OpenAI client: {type(e).__name__}: {e}")
         print("       Is OPENAI_API_KEY set in .env?")

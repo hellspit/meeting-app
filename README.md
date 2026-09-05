@@ -164,6 +164,9 @@ Set `audio.input_device` to part of that name if auto-detection misses it.
 
 ## Run it
 
+On Windows, double-click `start.cmd` after installing dependencies and adding
+your API key to `.env`. Startup errors remain visible in the launcher console.
+
 ```bash
 # Windows
 .\.venv\Scripts\python.exe -m src.main
@@ -230,6 +233,14 @@ defaults in `src/config.py`.
 ---
 
 ## Diagnostics
+
+If the local speech fixture is missing, generate it on Windows with
+`powershell -ExecutionPolicy Bypass -File scripts/generate_fixture.ps1`.
+Use `.venv\Scripts\python.exe scripts/check_realtime.py --loopback` to play
+that test question, capture system audio, and measure transcription and answer
+latency. Close other audio sources during this test; captured audio is uploaded
+to OpenAI. Reported end-of-speech latency is an estimate that includes the
+configured silence timers, rather than a measurement of the UI timer itself.
 
 Run these before a real meeting — they're cross-platform and each explains how to
 fix what it finds:

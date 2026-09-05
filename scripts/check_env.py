@@ -47,6 +47,8 @@ class CheckResult:
 def check_torch_and_vad() -> CheckResult:
     r = CheckResult("torch + Silero VAD (CPU)")
     try:
+        if not FIXTURE.exists():
+            return r.failed("speech fixture missing; run scripts/generate_fixture.ps1")
         import numpy as np
         import soundfile as sf
         import torch
@@ -112,7 +114,7 @@ def check_api_key() -> CheckResult:
     if not key:
         return r.failed("not set. Copy .env.example to .env and paste your key.")
     # Never print the key; just enough to confirm it's a plausible value.
-    return r.passed(f"set ({len(key)} chars, starts {key[:3]}…)")
+    return r.passed("set (value hidden)")
 
 
 def report_shield() -> None:
@@ -134,9 +136,6 @@ def main() -> int:
         f"on {platform.system()} {platform.release()}"
     )
     print(f"Executable: {sys.executable}")
-    if not FIXTURE.exists():
-        print(f"\nFATAL: fixture not found at {FIXTURE}")
-        return 2
     print("=" * 68)
 
     results = [

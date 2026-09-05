@@ -15,6 +15,7 @@ Audio -> transcription (answer spoken questions automatically) lands in M4.
 from __future__ import annotations
 
 import argparse
+import re
 import sys
 import threading
 import time
@@ -104,11 +105,16 @@ def _wrap(text: str, width: int) -> list[str]:
 # Follow-up quick actions: refine the CURRENT answer (uses conversation memory).
 _FOLLOWUP_PROMPTS = {
     "shorter": "Make that shorter — just the key point in one or two sentences.",
-    "deeper": "Go a bit deeper on that — add the key detail I might get asked next.",
+    "deeper": (
+        "Explain the key mechanism or tradeoff in more depth, in natural spoken "
+        "language. Add useful detail without repeating the previous answer."
+    ),
     "example": "Explain that with a concrete example.",
     "code": "Show me the code for that, as plain pasteable lines.",
     "natural": (
-        "Rephrase that to sound natural and conversational, like I'm just speaking."
+        "Rewrite that as a crisp spoken interview answer in everyday professional "
+        "English. Keep the technical substance, remove filler and formal phrasing, "
+        "and use natural contractions. No invented personal experience."
     ),
 }
 
@@ -165,6 +171,13 @@ def looks_like_question(text: str) -> bool:
     t = text.strip().lower()
     if not t:
         return False
+    t = re.sub(r"^(?:(?:okay|ok|so|well|hey|um|uh)[,\s]+)+", "", t)
+    if re.fullmatch(r"(?:can|could) you hear me[?.!]*", t):
+        return False
+    if t.startswith(("i was wondering", "i wonder", "i'd like to know")):
+        return True
+    if re.match(r"^what (?:we|i|they|you) (?:did|do|said|need)\b", t):
+        return t.endswith("?")
     if t.endswith("?"):
         return True
     if any(t.startswith(p) for p in _Q_STARTS):
@@ -254,7 +267,7 @@ def main() -> int:
     _client: dict = {"c": None}
     _conv: dict = {"c": None}
     _workers: set[StreamWorker] = set()
-    _state = {"busy": False}
+    _state = {"busy": False, "closing": False}
 
     def get_client():
         if _client["c"] is None:
@@ -262,7 +275,7 @@ def main() -> int:
 
             # max_retries: SDK retries transient errors (429 / 5xx / network)
             # with exponential backoff, so a blip doesn't kill the session.
-            _client["c"] = OpenAI(max_retries=4)
+            _client["c"] = OpenAI(max_retries=1, timeout=25.0)
         return _client["c"]
 
     def get_conversation() -> Conversation:
@@ -274,10 +287,22 @@ def main() -> int:
             )
         return _conv["c"]
 
+    _requests: deque = deque()
+
+    def stop_requests():
+        _state["closing"] = True
+        _requests.clear()
+        _auto_timer.stop()
+
+    app.aboutToQuit.connect(stop_requests)
+
     def stream_into_answer(factory) -> None:
         """Run a text-chunk generator in a worker and stream it into the panel."""
+        if _state["closing"]:
+            return
         if _state["busy"]:
-            return  # single-flight: ignore while a response is streaming
+            _requests.append(factory)
+            return
         _state["busy"] = True
         win.begin_stream()  # clears answer, snaps history view to "live"
         win.set_status("claude", "streaming")
@@ -289,6 +314,8 @@ def main() -> int:
             win.set_status("claude", "ready")
             _state["busy"] = False
             _workers.discard(worker)
+            if _requests:
+                stream_into_answer(_requests.popleft())
 
         def _fail(msg):
             win.append_answer(f"\n[error: {msg}]")
@@ -296,6 +323,8 @@ def main() -> int:
             win.set_status("claude", "error")
             _state["busy"] = False
             _workers.discard(worker)
+            if _requests:
+                stream_into_answer(_requests.popleft())
 
         worker.done.connect(_done)
         worker.failed.connect(_fail)
@@ -429,10 +458,14 @@ def main() -> int:
             win.set_status("claude", "error")
             win.append_answer(f"\n[screenshot failed: {e}]")
             return
-        conv.add_screen(png)
         win.set_transcript("[screen captured — analyzing…]")
         question = str(cfg.get("screen.question", "What's on my screen?"))
-        stream_into_answer(lambda: conv.ask_stream(question))
+
+        def screen_answer():
+            conv.add_screen(png)
+            yield from conv.ask_stream(question)
+
+        stream_into_answer(screen_answer)
 
     win.submitted.connect(on_question)
     win.followup.connect(on_followup)
@@ -455,6 +488,7 @@ def main() -> int:
                 target=pipeline.start, name="pipeline-start", daemon=True
             ).start()
         except Exception as e:  # noqa: BLE001 - e.g. missing key / no loopback
+            win.set_status("stt", "error")
             print(f"[pipeline] not started: {type(e).__name__}: {e}")
 
     # --- global hotkeys ------------------------------------------------------
@@ -484,6 +518,7 @@ def main() -> int:
         elif action == "analyze_screen":
             analyze_screen_action()
         elif action == "emergency_erase":
+            stop_requests()
             win.emergency_erase()
             QTimer.singleShot(300, QApplication.quit)
 

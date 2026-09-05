@@ -12,6 +12,8 @@ context/*
 __pycache__/
 *.pyc
 *.pyo
+.mypy_cache/
+.ruff_cache/
 
 # STT fixture audio is generated locally; keep the folder scaffolding
 scripts/fixtures/*.wav

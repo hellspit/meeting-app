@@ -13,6 +13,7 @@ touched on the main thread.
 from __future__ import annotations
 
 import threading
+import time
 from concurrent.futures import ThreadPoolExecutor
 from typing import TYPE_CHECKING
 
@@ -50,6 +51,7 @@ class Pipeline(QObject):
         )
         self.vad: StreamingVAD | None = None
         self._stop = threading.Event()
+        self._lifecycle = threading.Lock()
         self._thread: threading.Thread | None = None
         self._exec = ThreadPoolExecutor(max_workers=1, thread_name_prefix="stt")
 
@@ -63,24 +65,38 @@ class Pipeline(QObject):
             self.status.emit("stt", "error")
             self.error.emit(f"VAD load failed: {type(e).__name__}: {e}")
             return
-        self.status.emit("stt", "ready")
-
-        self.capture.start()  # sets rate/channels, emits capture status
-        self._stop.clear()
-        self._thread = threading.Thread(target=self._run, name="pipeline", daemon=True)
-        self._thread.start()
+        with self._lifecycle:
+            if self._stop.is_set():
+                return  # quit may have happened while the model was loading
+            self.status.emit("stt", "ready")
+            self.capture.start()
+            self._thread = threading.Thread(
+                target=self._run, name="pipeline", daemon=True
+            )
+            self._thread.start()
 
     def _run(self) -> None:
         assert self.vad is not None  # noqa: S101
+        last_audio = time.monotonic()
+        idle_timeout = float(self._cfg.get("audio.silence_timeout_ms", 700)) / 1000
         while not self._stop.is_set():
             raw = self.capture.read()
             if raw:
+                last_audio = time.monotonic()
                 mono = bytes_to_mono16k(raw, self.capture.channels, self.capture.rate)
                 for utt in self.vad.feed(mono):
                     self._exec.submit(self._transcribe, utt)
+            elif time.monotonic() - last_audio >= idle_timeout:
+                # WASAPI may stop delivering frames when playback ends rather
+                # than deliver silence. Finish speech even without another frame.
+                final = self.vad.flush_final()
+                if final is not None:
+                    self._exec.submit(self._transcribe, final)
             self._stop.wait(0.05)
 
     def _transcribe(self, utt) -> None:
+        if self._stop.is_set():
+            return
         try:
             text = self.transcriber.transcribe(utt)
         except Exception as e:  # noqa: BLE001
@@ -90,13 +106,14 @@ class Pipeline(QObject):
             self.error.emit(f"transcribe failed (skipped): {type(e).__name__}: {e}")
             self.status.emit("stt", "ready")
             return
-        if text:
+        if text and not self._stop.is_set():
             self.transcript.emit(text)
 
     def stop(self) -> None:
         self._stop.set()
-        if self._thread is not None:
-            self._thread.join(timeout=2.0)
-            self._thread = None
-        self.capture.stop()
-        self._exec.shutdown(wait=False)
+        with self._lifecycle:
+            if self._thread is not None:
+                self._thread.join(timeout=2.0)
+                self._thread = None
+            self.capture.stop()
+            self._exec.shutdown(wait=False, cancel_futures=True)

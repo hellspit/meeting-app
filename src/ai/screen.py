@@ -21,6 +21,8 @@ from collections.abc import Callable, Iterator
 import mss
 import mss.tools
 
+from src.ai.prompts import SYSTEM_PROMPT
+
 # Keep the screenshot from being huge: cap the long edge. GPT-4o downsamples
 # anyway, and smaller images are cheaper + faster to upload.
 MAX_EDGE = 1600
@@ -38,7 +40,10 @@ def capture_monitor_png(monitor_index: int = 0) -> bytes:
         if idx >= len(monitors):
             idx = 1
         shot = sct.grab(monitors[idx])
-        return mss.tools.to_png(shot.rgb, shot.size)
+        png = mss.tools.to_png(shot.rgb, shot.size)
+        if png is None:
+            raise RuntimeError("Screenshot encoding returned no image")
+        return png
 
 
 def _downscale_png_if_needed(png: bytes) -> bytes:
@@ -56,9 +61,9 @@ def _downscale_png_if_needed(png: bytes) -> bytes:
         if long_edge <= MAX_EDGE:
             return png
         scale = MAX_EDGE / long_edge
-        img = img.resize((int(w * scale), int(h * scale)))
+        resized = img.resize((int(w * scale), int(h * scale)))
         out = io.BytesIO()
-        img.save(out, format="PNG")
+        resized.save(out, format="PNG")
         return out.getvalue()
     except Exception:  # noqa: BLE001
         return png
@@ -81,13 +86,7 @@ def analyze_screen_stream(
     messages = [
         {
             "role": "system",
-            "content": (
-                "You help the user during a live meeting. Look at their screen "
-                "and answer concisely, leading with a ready-to-say line. Write "
-                "PLAIN TEXT only: no Markdown (**, *, backticks, #) and no LaTeX "
-                "(\\( \\), \\log); write math in plain words like O(log n). Never "
-                "invent facts you can't see."
-            ),
+            "content": SYSTEM_PROMPT,
         },
         {
             "role": "user",

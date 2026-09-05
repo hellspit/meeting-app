@@ -54,10 +54,10 @@ def _set_click_through_windows(window, enabled: bool) -> bool:
 def _set_click_through_qt(window, enabled: bool) -> bool:
     from PySide6.QtCore import Qt
 
-    if bool(window.windowFlags() & Qt.WindowTransparentForInput) == enabled:
+    if bool(window.windowFlags() & Qt.WindowType.WindowTransparentForInput) == enabled:
         return False  # already in the requested state
     was_visible = window.isVisible()
-    window.setWindowFlag(Qt.WindowTransparentForInput, enabled)
+    window.setWindowFlag(Qt.WindowType.WindowTransparentForInput, enabled)
     if was_visible:
         window.show()  # flag changes hide the window; bring it back
     return True  # native window was recreated — caller should re-shield
