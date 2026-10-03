@@ -1,12 +1,16 @@
 # Contributing to meeting-app
 
-Thanks for contributing! `main` is protected — all changes land through a pull
-request.
+Thanks for contributing! This repo uses a two-branch flow:
+
+- **`develop`** (default) — the integration branch. All contributions land
+  here through pull requests. Code here works but is still being tested.
+- **`release`** — the latest verified release. It only ever advances when a
+  maintainer merges `develop` into it; nothing else may target it.
 
 ## Workflow
 
 1. **Fork** the repo (external contributors) or create a branch (collaborators
-   with write access).
+   with write access), starting from the latest **`develop`**.
 2. **Name your branch by what it does** (enforced by CI and repo rules):
 
    | Prefix | Use for |
@@ -20,13 +24,17 @@ request.
    | `perf/<name>` | Performance improvements |
    | `test/<name>` | Adding or fixing tests |
 
-   Example: `git switch -c feature/mute-hotkey`
+   Example: `git switch develop && git pull && git switch -c feature/mute-hotkey`
 
 3. Make your changes and **run the checks locally** (below).
-4. Open a **pull request to `main`** and fill in the template.
+4. Open a **pull request to `develop`** and fill in the template.
 5. A repository admin reviews the PR. Only admins can merge, and only after an
-   approving review and green CI. Direct pushes to `main` are blocked for
-   everyone.
+   approving review and green CI. Direct pushes to `develop` and `release` are
+   blocked for everyone.
+
+When enough has been merged and verified on `develop`, a maintainer opens a
+`develop` → `release` pull request; CI (including a check that the source
+really is `develop`) runs, and an admin merges it. That merge is the release.
 
 ## Local checks (same as CI)
 
