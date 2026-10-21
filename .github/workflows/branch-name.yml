@@ -1,0 +1,30 @@
+name: Branch name
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions: {}
+
+jobs:
+  check:
+    name: branch-name
+    runs-on: ubuntu-latest
+    # Fork branch names are outside this repo's control, so the convention is
+    # only enforced on branches pushed to this repo. (A skipped job still
+    # satisfies a required status check.)
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    steps:
+      - name: Validate branch name
+        env:
+          BRANCH: ${{ github.head_ref }}
+        run: |
+          pattern='^(feature|fix|hotfix|chore|docs|refactor|perf|test|ci|release)/[A-Za-z0-9._/-]+$'
+          if [[ "$BRANCH" =~ $pattern || "$BRANCH" == dependabot/* ]]; then
+            echo "OK: '$BRANCH' follows the naming convention."
+          else
+            echo "::error::Branch '$BRANCH' does not follow the naming convention."
+            echo "Name branches like: feature/<short-description> or fix/<short-description>."
+            echo "Allowed prefixes: feature/ fix/ hotfix/ chore/ docs/ refactor/ perf/ test/ ci/ release/"
+            exit 1
+          fi

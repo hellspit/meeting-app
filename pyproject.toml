@@ -1,0 +1,46 @@
+# Tooling configuration only. There is intentionally no [project] table:
+# the app runs from a checkout (python -m src.main), it is not pip-installed.
+
+[tool.ruff]
+line-length = 88
+target-version = "py312"
+
+[tool.ruff.lint]
+select = [
+    "E",   # pycodestyle errors
+    "W",   # pycodestyle warnings
+    "F",   # pyflakes
+    "I",   # isort (import ordering)
+    "N",   # pep8-naming
+    "UP",  # pyupgrade
+    "B",   # flake8-bugbear
+    "C4",  # flake8-comprehensions
+    "SIM", # flake8-simplify
+    "BLE", # flake8-blind-except
+    "ARG", # flake8-unused-arguments
+    "S",   # flake8-bandit (security)
+    "RUF", # ruff-specific rules
+]
+
+[tool.ruff.lint.isort]
+known-first-party = ["src"]
+
+[tool.black]
+line-length = 88
+target-version = ["py312"]
+
+[tool.mypy]
+# Type-check as Windows/py3.12: the Win32 backends are the only code touching
+# platform-gated stdlib APIs (ctypes.windll), so win32 is the one platform
+# setting under which every module resolves. The macOS/Linux paths use untyped
+# third-party libs (pyobjc, pynput, sounddevice) and check the same either way.
+python_version = "3.12"
+platform = "win32"
+files = ["src", "scripts"]
+ignore_missing_imports = true
+check_untyped_defs = true
+warn_redundant_casts = true
+warn_unused_ignores = true
+
+[tool.bandit]
+exclude_dirs = [".venv", "temp", "context"]
