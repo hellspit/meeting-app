@@ -3,7 +3,7 @@
 ruff==0.15.22
 black==25.11.0
 mypy==1.19.1
-types-PyYAML==6.0.12.20250915
+types-PyYAML==6.0.12.20260906
 bandit==1.8.6
 pip-audit==2.9.0
 pre-commit==4.3.0
